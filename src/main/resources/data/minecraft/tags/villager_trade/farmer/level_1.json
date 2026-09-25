@@ -1,0 +1,10 @@
+{
+  "replace": true,
+  "values": [
+    "yconomics:farmer/level_1/wheat_nugget",
+    "yconomics:farmer/level_1/potato_nugget",
+    "yconomics:farmer/level_1/carrot_nugget",
+    "yconomics:farmer/level_1/beetroot_nugget",
+    "yconomics:farmer/level_1/nugget_bread"
+  ]
+}

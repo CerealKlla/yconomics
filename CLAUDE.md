@@ -4,7 +4,7 @@ Economy-themed mod for a modular Minecraft project (Minecraft Java Edition). Par
 
 ## Context directory — read this first
 
-`context/` is meant to become a **separate private repo** (`yconomics-context`, mirroring `cartographyr-context`/`lyfe-context`), the same pattern used by the rest of the suite — **not yet created/pushed to GitHub as of 2026-09-25**, currently just a local subdirectory here. Once created, it should be gitignored from this repo and cloned as a subdirectory, same as the other two mods:
+`context/` is a **separate private repo** (https://github.com/CerealKlla/yconomics-context), not part of this one — it's listed in `.gitignore` here and must never be committed to this repo. It's cloned as a subdirectory at `context/` for local convenience. If this directory is missing (e.g. a fresh clone of just this repo), restore it with:
 
 ```
 git clone https://github.com/CerealKlla/yconomics-context.git context
@@ -20,7 +20,7 @@ Before searching source for architecture, ownership boundaries, API shape, or "w
 - When a design decision is made that conflicts with or is absent from design-document.md, update design-document.md directly and add a dated entry to decisions.md explaining the change.
 - When a class is added or its public surface changes, add or update its file in `context/classes/`.
 - Don't let source and these docs drift — treat updating them as part of finishing the change, not optional cleanup.
-- Once `context/` is a real separate repo, it has its own git history, independent of this repo's commits — commit and push changes there separately.
+- `context/` has its own git history, independent of this repo's commits. Commit and push changes there separately (`git -C context add . && git -C context commit -m "..." && git -C context push`) — editing the files alone doesn't back them up.
 
 ## Status
 
@@ -30,13 +30,14 @@ Scaffolded 2026-09-25 (see [context/decisions.md](context/decisions.md)):
 - Java: **JDK 25** (standalone Eclipse Temurin, JAVA_HOME set) — same toolchain as the rest of the suite
 - Group ID: `com.github.cerealklla.yconomics` / Mod ID: `yconomics`
 - Project structure copied verbatim from Cartographyr/Lyfe's own MDK setup (`build.gradle`, `settings.gradle`, wrapper) — no Yconomics-specific build changes yet.
+- Public code repo (https://github.com/CerealKlla/yconomics) and private context repo (https://github.com/CerealKlla/yconomics-context) both created and pushed.
 
 **First vertical slice: the "gambling" recipe** (design doc Section 3) — a real, working `GamblingRecipe extends CustomRecipe` (1 gold ingot → random 5–12 gold nuggets), registered, datapack-declared, unit tested (`GamblingRecipeTest`), boot-smoke-tested clean via `runServer`. **Live in-game confirmation (actually craft with it) is still pending.** The plain 9-nuggets-to-1-ingot direction needed no new code — it's already a real vanilla recipe.
 
-Not yet started: the currency swap (villager/wandering-trader trades pricing in Gold Nuggets instead of Emeralds) and the dropped-item bag (a player's dropped items collecting into a single lootable, despawn-when-empty entity instead of scattering). Both are sketched at a high level in design-document.md Sections 2 and 4, with real open questions flagged in each — neither has a concrete implementation plan yet.
+**Currency swap started** (design doc Section 2) — real trade system researched against the decompiled source (a genuinely different, fully registry/datapack-driven model than the design doc originally assumed; no `VillagerTradesEvent`-style hook exists in this NeoForge version). First slice built: **Farmer level 1** trades 5 nugget-priced entries via a `data/minecraft/tags/villager_trade/farmer/level_1.json` override, no Java code needed. Boot-smoke-tested clean. **Live confirmation (actually trade with a farmer) is still pending.** The other 13 professions + wandering trader are the same mechanical pattern, not yet done.
 
-Not yet done, same as the rest of the suite at this stage: a GitHub repo for this code (public) and the `yconomics-context` repo (private) haven't been created — this has all been local-only work so far.
+Design settled but not yet built: the dropped-item bag (design doc Section 4) — every dropped item including death drops, 3-block clustering, right-click-only chest-style container, no capacity cap, despawns on the normal item-entity timer. Also newly flagged, ownership undecided: an NPC gossip/paid-tips mechanic (Section 5) that touches Lyfe's Cartographyr-skill `KnowledgeFactor` system.
 
-Next: **live confirmation of the gambling recipe** via `runClient`. After that: pick between the currency swap and the dropped-item bag as the next vertical slice, resolve that mechanic's open design questions (see design-document.md), and build it out to a real functional state rather than a stub — same "finish what you start" approach as the gambling recipe.
+Next: **live confirmation of both the gambling recipe and the Farmer-level-1 trades** via `runClient`. After that: either extend the currency swap to the remaining professions/wandering trader (mechanical repetition of the same pattern), or start the dropped-item bag — user's call. The gossip mechanic's mod ownership needs deciding before it can be built at all.
 
 See [context/classes/](context/classes/) for per-class reference.
