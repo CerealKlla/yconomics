@@ -50,6 +50,13 @@ public class LootBagEntity extends Entity implements MenuProvider {
     public LootBagEntity(EntityType<? extends LootBagEntity> type, Level level) {
         super(type, level);
         this.noPhysics = true; // Sits exactly where it's created -- no falling/pushing.
+
+        // A floating "Loot Bag" nametag is the *entire* visual for this first version (see
+        // bag.client.LootBagRenderer -- a bare-minimum EntityRenderer with no model of its own,
+        // relying entirely on this to make the entity findable at all). Real client-rendered
+        // work (a model/texture) is a follow-up, not built this pass.
+        setCustomName(Component.literal("Loot Bag"));
+        setCustomNameVisible(true);
     }
 
     public static LootBagEntity create(ServerLevel level, double x, double y, double z) {
