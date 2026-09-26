@@ -64,6 +64,19 @@ public record CoinPurseContents(List<ItemStack> stacks) {
      * as fits under {@code capacity}, merging into existing under-64 stacks before starting new
      * ones. Mutates {@code incoming} in place (shrinks it by however much was actually taken),
      * matching {@code ItemStack#split}-style conventions used elsewhere in this project.
+     *
+     * <p><b>Overflow safety</b> (a real playtest concern, 2026-09-26 -- what happens once a purse
+     * fills up and more loose nuggets get picked up): {@code available} is clamped to {@code
+     * Math.max(0, capacity - totalCount())}, so it's never negative even if the purse is already at
+     * or somehow over capacity (e.g. right after a tier downgrade). {@code toInsert} is bounded by
+     * both {@code available} and {@code incoming.getCount()}, so {@link ItemStack#shrink} is always
+     * called with a value in {@code [0, incoming.getCount()]} -- it can never under/over-shrink,
+     * throw, or silently destroy nuggets that didn't fit. Whatever's left in {@code incoming} after
+     * this call is exactly what didn't fit, unchanged, ready for the caller ({@code
+     * CoinPurseListener#sweepNuggetsIntoPurse}) to simply leave sitting in the player's normal
+     * inventory slot. Not unit-testable in this project's plain JUnit setup -- constructing a real
+     * {@code ItemStack} needs vanilla's data components bootstrapped, which isn't available outside
+     * a running game in this MC version -- verified by inspection instead; see decisions.md.
      */
     public InsertResult insert(ItemStack incoming, int capacity) {
         List<ItemStack> next = new ArrayList<>(stacks.size() + 1);

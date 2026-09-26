@@ -47,6 +47,8 @@ All three fixed. Along the way, three playtest-requested UI improvements landed 
 
 Newly flagged, ownership undecided: an NPC gossip/paid-tips mechanic (Section 5) that touches Lyfe's Cartographyr-skill `KnowledgeFactor` system — not started, needs a decision on which mod owns it first.
 
+**Coin Purse overflow safety documented; new `shop.PurchaseLock` stub, 2026-09-26** (see [context/decisions.md](context/decisions.md)) — confirmed by code inspection (not a new unit test — constructing a real `ItemStack` in this project's plain JUnit setup throws "Components not bound yet," and `Bootstrap.bootStrap()` alone doesn't fix it) that a full Coin Purse already safely leaves overflow nuggets in the normal inventory, no behavior change needed. Separately, a new `shop.PurchaseLock` functional interface (`Optional<Component> checkLocked(Player)`) is the generic "is this player currently allowed to buy this" mechanism the user asked for — meant to cover both skill-level gates and future "out of stock" cases with one mechanism. First consumer is Lyfe's new Merchant skill (`CoinPurseTierUnlocks`, gating Coin Purse T6/T7/T8 behind Merchant levels 25/35/45), but the actual vendor selling those tiers is an explicit stub — seller and price still undecided.
+
 Next: **live confirmation of the bag's UI polish**, then a full pass over everything built this session together — the gambling recipe, the full currency swap, hostile mob drops, the Coin Purse, and the dropped-item bag (the user's own stated test plan).
 
 See [context/classes/](context/classes/) for per-class reference.

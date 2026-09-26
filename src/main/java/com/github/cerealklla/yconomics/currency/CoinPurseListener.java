@@ -250,7 +250,14 @@ public final class CoinPurseListener {
         inventory.setItem(purseSlot, displaced);
     }
 
-    /** Sweeps every loose {@link Items#GOLD_NUGGET} stack in the player's inventory (including equipment slots) into the purse, up to its capacity. */
+    /**
+     * Sweeps every loose {@link Items#GOLD_NUGGET} stack in the player's inventory (including
+     * equipment slots) into the purse, up to its capacity. Safe when the purse is already full or
+     * over capacity (2026-09-26 playtest concern, see decisions.md) -- {@link
+     * CoinPurseContents#insert} clamps how much it takes to whatever room actually remains, so any
+     * stack that doesn't fully fit is simply left (partially or wholly) sitting in this same
+     * inventory slot, never lost, duplicated, or thrown.
+     */
     private static void sweepNuggetsIntoPurse(ServerPlayer player) {
         ItemStack purse = findPurse(player);
         if (purse == null) {
