@@ -105,9 +105,42 @@ public record CoinPurseContents(List<ItemStack> stacks) {
         return new RemoveResult(new CoinPurseContents(next), removed);
     }
 
+    /**
+     * Removes up to {@code amount} nuggets (possibly less, if the purse doesn't hold that much),
+     * taking from the most-recently-added stack(s) first (LIFO, same ordering as {@link
+     * #removeLast}) and splitting the last one touched if it doesn't need to be fully consumed.
+     * Used for exact-amount withdrawals -- e.g. topping up just enough loose nuggets for a single
+     * villager trade, rather than moving the whole balance (see {@code CoinPurseListener}).
+     */
+    public WithdrawResult withdraw(int amount) {
+        List<ItemStack> next = new ArrayList<>(stacks.size());
+        for (ItemStack stack : stacks) {
+            next.add(stack.copy());
+        }
+
+        int remaining = amount;
+        int withdrawn = 0;
+        while (remaining > 0 && !next.isEmpty()) {
+            int lastIndex = next.size() - 1;
+            ItemStack last = next.get(lastIndex);
+            int take = Math.min(remaining, last.getCount());
+            withdrawn += take;
+            remaining -= take;
+            if (take >= last.getCount()) {
+                next.remove(lastIndex);
+            } else {
+                last.shrink(take);
+            }
+        }
+        return new WithdrawResult(new CoinPurseContents(next), withdrawn);
+    }
+
     public record InsertResult(CoinPurseContents contents, int inserted) {
     }
 
     public record RemoveResult(CoinPurseContents contents, ItemStack removed) {
+    }
+
+    public record WithdrawResult(CoinPurseContents contents, int withdrawn) {
     }
 }

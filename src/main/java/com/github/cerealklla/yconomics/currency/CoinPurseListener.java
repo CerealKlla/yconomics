@@ -2,6 +2,7 @@ package com.github.cerealklla.yconomics.currency;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.github.cerealklla.yconomics.api.Yconomics;
@@ -15,6 +16,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.ItemCost;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -40,11 +44,16 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  *
  * <p><b>Vendor purchases</b>: villager/wandering-trader trading needs loose nuggets physically in
  * the trade-input slots (vanilla's {@code MerchantMenu} has no hook for pulling payment from an
- * alternate reserve), which the sweep would otherwise make impossible by vacuuming everything into
- * the purse the moment it's picked up. Resolved by auto-withdrawing the full purse balance into the
- * player's inventory whenever a {@code MerchantMenu} opens ({@link #onContainerOpen}) -- shopping
- * "just works" without the player manually managing coins, and {@link #onContainerClose} (which
- * fires for every container, this one included) sweeps whatever's left back in afterward.
+ * alternate reserve, and its own internal "active offer" isn't exposed publicly enough to top up
+ * exactly what one specific trade needs). The balance is meant to be spent from the purse's own
+ * total, not physically handed over from the inventory, so this deliberately does NOT move the
+ * whole balance into the inventory (a purse can hold thousands of nuggets at higher tiers -- far
+ * more than 36 slots of 64-stacks could ever hold). Instead, while a {@code MerchantMenu} is open
+ * ({@link #onPlayerTick}), it keeps just enough loose nuggets on hand to cover whatever the single
+ * most expensive nugget-priced offer that merchant has costs -- topped up from the purse only as a
+ * shortfall appears, never all at once -- and {@link #onContainerClose} sweeps every loose nugget
+ * back into the purse the moment the screen closes, so nothing is ever left sitting loose in the
+ * inventory. From the player's perspective the purse's total balance visibly funds any purchase.
  */
 public final class CoinPurseListener {
 
@@ -105,18 +114,23 @@ public final class CoinPurseListener {
         }
     }
 
-    @SubscribeEvent
-    public void onContainerOpen(PlayerContainerEvent.Open event) {
-        if (event.getContainer() instanceof MerchantMenu && event.getEntity() instanceof ServerPlayer player) {
-            withdrawAllIntoInventory(player);
-        }
-    }
-
-    /** Periodically corrects the purse's slot -- see {@link #PURSE_HOME_SLOT}'s own note. */
+    /**
+     * Every tick a player has a {@code MerchantMenu} open, tops up loose nuggets from the purse
+     * up to whatever the single priciest nugget-costing offer at that merchant requires -- see the
+     * class doc's "Vendor purchases" note for why this is bounded rather than moving the whole
+     * balance. Checked every tick (not throttled, unlike {@link #enforcePurseHomeSlot}) since this
+     * only runs at all while a trade screen is actually open, a short, rare state.
+     */
     @SubscribeEvent
     public void onPlayerTick(PlayerTickEvent.Post event) {
-        if (event.getEntity() instanceof ServerPlayer player && player.tickCount % SLOT_CHECK_INTERVAL_TICKS == 0) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+        if (player.tickCount % SLOT_CHECK_INTERVAL_TICKS == 0) {
             enforcePurseHomeSlot(player);
+        }
+        if (player.containerMenu instanceof MerchantMenu merchantMenu) {
+            topUpForShopping(player, merchantMenu);
         }
     }
 
@@ -256,22 +270,65 @@ public final class CoinPurseListener {
         }
     }
 
-    /** Auto-refill for shopping (see class doc) -- moves the purse's entire balance into the inventory as real nugget stacks. */
-    private static void withdrawAllIntoInventory(ServerPlayer player) {
+    /**
+     * Bounded auto-refill for shopping (see class doc) -- tops up loose nuggets only up to whatever
+     * the single priciest nugget-costing offer at this merchant needs, withdrawing just the
+     * shortfall from the purse each time (never the whole balance).
+     */
+    private static void topUpForShopping(ServerPlayer player, MerchantMenu merchantMenu) {
+        int maxCost = maxSingleNuggetCost(merchantMenu.getOffers());
+        if (maxCost <= 0) {
+            return;
+        }
+        int loose = countLooseNuggets(player);
+        if (loose >= maxCost) {
+            return;
+        }
+
         ItemStack purse = findPurse(player);
         if (purse == null) {
             return;
         }
         CoinPurseContents contents = purse.getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
-        if (contents.isEmpty()) {
+        CoinPurseContents.WithdrawResult result = contents.withdraw(maxCost - loose);
+        if (result.withdrawn() <= 0) {
             return;
         }
-        for (ItemStack stack : contents.stacks()) {
-            ItemStack copy = stack.copy();
-            if (!player.getInventory().add(copy)) {
-                player.drop(copy, false);
+
+        ItemStack nuggets = new ItemStack(Items.GOLD_NUGGET, result.withdrawn());
+        if (player.getInventory().add(nuggets)) {
+            purse.set(ModItems.COIN_PURSE_CONTENTS, result.contents());
+        }
+        // If it couldn't be placed anywhere (inventory completely full), leave the purse untouched
+        // -- that trade just can't be completed right now, rather than losing the withdrawn amount.
+    }
+
+    private static int maxSingleNuggetCost(MerchantOffers offers) {
+        int max = 0;
+        for (MerchantOffer offer : offers) {
+            int cost = nuggetAmount(offer.getItemCostA().itemStack());
+            Optional<ItemCost> costB = offer.getItemCostB();
+            if (costB.isPresent()) {
+                cost += nuggetAmount(costB.get().itemStack());
+            }
+            max = Math.max(max, cost);
+        }
+        return max;
+    }
+
+    private static int nuggetAmount(ItemStack stack) {
+        return stack.is(Items.GOLD_NUGGET) ? stack.getCount() : 0;
+    }
+
+    private static int countLooseNuggets(Player player) {
+        Inventory inventory = player.getInventory();
+        int total = 0;
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            ItemStack stack = inventory.getItem(i);
+            if (stack.is(Items.GOLD_NUGGET)) {
+                total += stack.getCount();
             }
         }
-        purse.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
+        return total;
     }
 }
