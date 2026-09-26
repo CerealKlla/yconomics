@@ -52,25 +52,42 @@ public class CoinPurseItem extends Item {
     }
 
     /**
-     * The carried stack (this purse) is clicked onto {@code slot}'s stack -- try to stuff that
-     * stack in. Uses {@code slot.safeTake}, the same "properly remove respecting modification
-     * rules" primitive vanilla's own {@code BundleContents.Mutable#tryTransfer} uses, rather than
-     * mutating {@code slot.getItem()} directly.
+     * The carried stack (this purse) is clicked onto {@code slot} -- matches vanilla Bundle's own
+     * two-click-action behavior exactly: {@code PRIMARY} (left-click) onto a slot holding Gold
+     * Nuggets stuffs that stack in; {@code SECONDARY} (right-click) onto an *empty* slot pops one
+     * stack back out of the purse into it. The right-click-to-pop-a-stack-out half was missing
+     * entirely from the first version of this method (only insertion was implemented) -- a real
+     * playtest report: nothing happened when right-clicking an empty slot with the purse carried.
      */
     @Override
     public boolean overrideStackedOnOther(ItemStack self, Slot slot, ClickAction clickAction, Player player) {
-        if (clickAction != ClickAction.PRIMARY) {
-            return false;
-        }
         ItemStack clicked = slot.getItem();
-        if (clicked.isEmpty() || !clicked.is(Items.GOLD_NUGGET)) {
-            return false;
+        if (clickAction == ClickAction.PRIMARY && !clicked.isEmpty()) {
+            if (!clicked.is(Items.GOLD_NUGGET)) {
+                return false;
+            }
+            int capacity = Yconomics.coinPurseCapacity(Yconomics.getCoinPurseTier(player));
+            int available = Math.max(0, capacity - contentsOf(self).totalCount());
+            ItemStack taken = slot.safeTake(clicked.getCount(), available, player);
+            depositAndReturnLeftover(self, taken, capacity, slot, player);
+            return true;
+        } else if (clickAction == ClickAction.SECONDARY && clicked.isEmpty()) {
+            CoinPurseContents.RemoveResult result = contentsOf(self).removeLast();
+            if (!result.removed().isEmpty()) {
+                self.set(ModItems.COIN_PURSE_CONTENTS, result.contents());
+                ItemStack remainder = slot.safeInsert(result.removed());
+                if (!remainder.isEmpty()) {
+                    // The slot was just confirmed empty, so this shouldn't normally happen -- stay
+                    // safe rather than silently destroy it if it somehow does.
+                    if (!player.getInventory().add(remainder)) {
+                        player.drop(remainder, false);
+                    }
+                }
+                broadcastChanges(player);
+            }
+            return true;
         }
-        int capacity = Yconomics.coinPurseCapacity(Yconomics.getCoinPurseTier(player));
-        int available = Math.max(0, capacity - contentsOf(self).totalCount());
-        ItemStack taken = slot.safeTake(clicked.getCount(), available, player);
-        depositAndReturnLeftover(self, taken, capacity, slot, player);
-        return true;
+        return false;
     }
 
     /** Some other stack is clicked onto the purse (the purse is {@code slot}'s own item, {@code other} is carried). */
