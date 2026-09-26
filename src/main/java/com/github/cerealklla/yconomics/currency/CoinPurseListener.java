@@ -236,6 +236,14 @@ public final class CoinPurseListener {
         if (purseSlot == -1 || purseSlot == PURSE_HOME_SLOT) {
             return;
         }
+        // Don't yank it out of the player's hand while they're actively holding it -- a real bug
+        // caught via playtest: right-clicking the purse to withdraw a stack requires first
+        // selecting it into the hotbar/hand, which this correction was undoing before the click
+        // could ever register, making CoinPurseItem#use completely unreachable. Only correct it
+        // when it's sitting idle somewhere it shouldn't be, not the slot currently in hand.
+        if (purseSlot == inventory.getSelectedSlot()) {
+            return;
+        }
         ItemStack purse = inventory.getItem(purseSlot);
         ItemStack displaced = inventory.getItem(PURSE_HOME_SLOT);
         inventory.setItem(PURSE_HOME_SLOT, purse);
