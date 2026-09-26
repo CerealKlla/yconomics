@@ -9,6 +9,7 @@ import com.github.cerealklla.yconomics.currency.CoinPurseListener;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
 import com.github.cerealklla.yconomics.registration.ModEntities;
 import com.github.cerealklla.yconomics.registration.ModItems;
+import com.github.cerealklla.yconomics.registration.ModMenus;
 import com.github.cerealklla.yconomics.registration.ModRecipes;
 
 import net.neoforged.bus.api.IEventBus;
@@ -28,6 +29,7 @@ public class YconomicsMod {
         ModItems.ITEMS.register(modEventBus);
         ModItems.DATA_COMPONENTS.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
+        ModMenus.MENU_TYPES.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(new CoinPurseListener());
         NeoForge.EVENT_BUS.register(new HostileMobDrops());

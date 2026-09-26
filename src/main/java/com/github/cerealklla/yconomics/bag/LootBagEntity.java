@@ -1,6 +1,7 @@
 package com.github.cerealklla.yconomics.bag;
 
 import com.github.cerealklla.yconomics.registration.ModEntities;
+import com.github.cerealklla.yconomics.registration.ModMenus;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -27,9 +28,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A dropped-item bag (design doc Section 4, see decisions.md) -- a world entity, not a block,
  * that collects a cluster of nearby drops instead of leaving them as loose {@code ItemEntity}s.
- * Right-click opens a real chest-style container ({@link ChestMenu#sixRows}, vanilla's own
- * generic 6-row menu/screen, reused wholesale -- no custom menu type or screen class needed since
- * this is exactly the same shape as a double chest).
+ * Right-click opens a real chest-style container ({@link LootBagMenu}, a thin {@link ChestMenu}
+ * subclass adding one "Take All" button -- see decisions.md, 2026-09-25).
  *
  * <p><b>54 slots, not literally unbounded</b> -- the design called for "no capacity cap ... if at
  * all technically feasible," but a truly unbounded inventory needs a custom scrolling screen,
@@ -44,7 +44,19 @@ public class LootBagEntity extends Entity implements MenuProvider {
     // any other dropped item's, per the design doc's "same despawn timer as any other item" call.
     private static final int DESPAWN_TICKS = 6000;
 
-    private final SimpleContainer items = new SimpleContainer(54);
+    // stillValid() overridden so the viewing player's own screen auto-closes the moment this
+    // becomes invalid (removed) -- ServerPlayer#doTick() already checks this every tick for
+    // whatever menu a player has open and force-closes it if false, the same generic mechanism
+    // vanilla itself uses when a chest block is destroyed out from under an open screen. Added
+    // after a playtest request ("the UI should auto-close once the last item is removed") --
+    // paired with #tick's own "discard once empty" logic below, so emptying the bag discards it
+    // within at most one tick, which this then turns into an automatic screen close.
+    private final SimpleContainer items = new SimpleContainer(LootBagMenu.SLOT_COUNT) {
+        @Override
+        public boolean stillValid(Player player) {
+            return !isRemoved();
+        }
+    };
     private int ticksUntilDespawn = DESPAWN_TICKS;
 
     public LootBagEntity(EntityType<? extends LootBagEntity> type, Level level) {
@@ -128,7 +140,7 @@ public class LootBagEntity extends Entity implements MenuProvider {
 
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory inventory, Player player) {
-        return ChestMenu.sixRows(containerId, inventory, items);
+        return new LootBagMenu(ModMenus.LOOT_BAG.get(), containerId, inventory, items);
     }
 
     @Override
