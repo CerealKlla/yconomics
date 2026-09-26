@@ -89,8 +89,14 @@ public final class LootBagListener {
         }
     }
 
-    /** Deposits into a nearby-or-new bag; whatever doesn't fit (the bag is full) scatters as a normal item, per the design's own fallback. */
-    private static void depositOrScatter(ServerLevel level, Vec3 pos, ItemStack stack) {
+    /**
+     * Deposits into a nearby-or-new bag; whatever doesn't fit (the bag is full) scatters as a
+     * normal item, per the design's own fallback. Public (widened from {@code private} 2026-09-25,
+     * see decisions.md) so {@code currency.CoinPurseListener} can route a Coin Purse's death-retained
+     * loose nuggets through the same clustering logic as any other death drop, instead of spawning a
+     * raw {@code ItemEntity} that the rest of this class would never actually see or bag.
+     */
+    public static void depositOrScatter(ServerLevel level, Vec3 pos, ItemStack stack) {
         if (stack.isEmpty()) {
             return;
         }

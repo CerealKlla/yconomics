@@ -4,11 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.github.cerealklla.yconomics.api.Yconomics;
+import com.github.cerealklla.yconomics.bag.LootBagListener;
 import com.github.cerealklla.yconomics.registration.ModItems;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MerchantMenu;
@@ -20,12 +21,13 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * The Coin Purse mechanic (design doc Section 2/currency, see decisions.md 2026-09-25) -- every
  * player always carries exactly one {@link CoinPurseItem}, which silently absorbs loose {@link
- * Items#GOLD_NUGGET} at two trigger points (never continuously -- see below) and pays out for
- * villager trading automatically.
+ * Items#GOLD_NUGGET} at two trigger points (never continuously -- see below), pays out for
+ * villager trading automatically, and can't be lost, hidden in the hotbar, or given away.
  *
  * <p><b>Why the sweep is trigger-based, not a continuous per-tick sweep</b>: the whole point of
  * letting a player pull nuggets out of the purse ({@link CoinPurseItem#use}) is so they sit loose
@@ -53,9 +55,18 @@ public final class CoinPurseListener {
     // not something that needs to survive a server restart.
     private final Map<UUID, Integer> retainedOnDeath = new HashMap<>();
 
-    // What fraction of a purse's contents stay on the body (as loose nuggets, which fold into
-    // whatever the dropped-item bag mechanic is once it exists) rather than being returned directly.
+    // What fraction of a purse's contents stay on the body (as loose nuggets, deposited into the
+    // dropped-item bag mechanic same as any other death drop) rather than being returned directly.
     private static final double RETAINED_ON_BODY_FRACTION = 0.10;
+
+    // Inventory's own slot indexing: 0-8 are the hotbar, 9 is the main grid's row-0/col-0 slot --
+    // the purse's one "home" position (a playtest request: never on the hotbar, always sorted to
+    // (0,0), swapping with whatever's already there). Checked periodically, not on every single
+    // inventory change (see #onPlayerTick) -- a full click-level intercept of the vanilla player
+    // inventory menu would need far more invasive surgery than a small period of possibly seeing
+    // the purse sit in the wrong slot for a few ticks is worth.
+    private static final int PURSE_HOME_SLOT = 9;
+    private static final int SLOT_CHECK_INTERVAL_TICKS = 4;
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
@@ -75,7 +86,7 @@ public final class CoinPurseListener {
         if (retained != null && retained > 0) {
             ItemStack purse = findPurse(player);
             if (purse != null) {
-                purse.set(ModItems.NUGGET_COUNT, purse.getOrDefault(ModItems.NUGGET_COUNT, 0) + retained);
+                purse.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.of(retained));
             }
         }
     }
@@ -101,6 +112,14 @@ public final class CoinPurseListener {
         }
     }
 
+    /** Periodically corrects the purse's slot -- see {@link #PURSE_HOME_SLOT}'s own note. */
+    @SubscribeEvent
+    public void onPlayerTick(PlayerTickEvent.Post event) {
+        if (event.getEntity() instanceof ServerPlayer player && player.tickCount % SLOT_CHECK_INTERVAL_TICKS == 0) {
+            enforcePurseHomeSlot(player);
+        }
+    }
+
     /**
      * The purse can't actually be given away/lost by tossing it (Q or drag-out-of-inventory) --
      * {@link ItemTossEvent}'s own doc warns that cancelling it does NOT stop the item from being
@@ -113,11 +132,11 @@ public final class CoinPurseListener {
         if (!event.getEntity().getItem().is(ModItems.COIN_PURSE.get()) || !(event.getPlayer() instanceof ServerPlayer player)) {
             return;
         }
-        int count = event.getEntity().getItem().getOrDefault(ModItems.NUGGET_COUNT, 0);
+        CoinPurseContents contents = event.getEntity().getItem().getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
         event.getEntity().discard();
 
         ItemStack replacement = new ItemStack(ModItems.COIN_PURSE.get());
-        replacement.set(ModItems.NUGGET_COUNT, count);
+        replacement.set(ModItems.COIN_PURSE_CONTENTS, contents);
         if (!player.getInventory().add(replacement)) {
             player.drop(replacement, false);
         }
@@ -127,19 +146,21 @@ public final class CoinPurseListener {
      * Strips the purse out of the player's inventory before vanilla's own death-drop logic runs
      * (this event fires at the very start of the death process), so it never becomes a normal,
      * lootable world drop. {@link #RETAINED_ON_BODY_FRACTION} of its contents drop as loose nuggets
-     * at the death location instead (the "10% remain on the body" behavior) -- the rest is stashed
-     * in {@link #retainedOnDeath} and handed back on {@link #onPlayerRespawn}.
+     * at the death location instead (the "10% remain on the body" behavior, deposited into the
+     * dropped-item bag mechanic via {@link LootBagListener#depositOrScatter} -- the same clustering
+     * every other death drop goes through, not a raw untracked {@code ItemEntity}); the rest is
+     * stashed in {@link #retainedOnDeath} and handed back on {@link #onPlayerRespawn}.
      */
     @SubscribeEvent
     public void onLivingDeath(LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel serverLevel)) {
             return;
         }
         ItemStack purse = findPurse(player);
         if (purse == null) {
             return;
         }
-        int total = purse.getOrDefault(ModItems.NUGGET_COUNT, 0);
+        int total = purse.getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY).totalCount();
         removePurseFromInventory(player, purse);
 
         if (total <= 0) {
@@ -151,10 +172,8 @@ public final class CoinPurseListener {
         int returnedToPlayer = total - leftOnBody;
         retainedOnDeath.put(player.getUUID(), returnedToPlayer);
 
-        if (leftOnBody > 0 && player.level() instanceof ServerLevel serverLevel) {
-            ItemEntity drop = new ItemEntity(serverLevel, player.getX(), player.getY(), player.getZ(),
-                    new ItemStack(Items.GOLD_NUGGET, leftOnBody));
-            serverLevel.addFreshEntity(drop);
+        if (leftOnBody > 0) {
+            LootBagListener.depositOrScatter(serverLevel, player.position(), new ItemStack(Items.GOLD_NUGGET, leftOnBody));
         }
     }
 
@@ -162,7 +181,7 @@ public final class CoinPurseListener {
     private static void ensurePurse(ServerPlayer player) {
         if (findPurse(player) == null) {
             ItemStack fresh = new ItemStack(ModItems.COIN_PURSE.get());
-            fresh.set(ModItems.NUGGET_COUNT, 0);
+            fresh.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
             if (!player.getInventory().add(fresh)) {
                 player.drop(fresh, false); // Best-effort: only reached with a completely full inventory.
             }
@@ -190,23 +209,50 @@ public final class CoinPurseListener {
         }
     }
 
-    /** Removes every loose {@link Items#GOLD_NUGGET} stack from the player's inventory (including equipment slots) into the purse. */
+    /** Never on the hotbar, always in {@link #PURSE_HOME_SLOT} -- swaps with whatever's currently there. */
+    private static void enforcePurseHomeSlot(ServerPlayer player) {
+        Inventory inventory = player.getInventory();
+        int purseSlot = -1;
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (inventory.getItem(i).is(ModItems.COIN_PURSE.get())) {
+                purseSlot = i;
+                break;
+            }
+        }
+        if (purseSlot == -1 || purseSlot == PURSE_HOME_SLOT) {
+            return;
+        }
+        ItemStack purse = inventory.getItem(purseSlot);
+        ItemStack displaced = inventory.getItem(PURSE_HOME_SLOT);
+        inventory.setItem(PURSE_HOME_SLOT, purse);
+        inventory.setItem(purseSlot, displaced);
+    }
+
+    /** Sweeps every loose {@link Items#GOLD_NUGGET} stack in the player's inventory (including equipment slots) into the purse, up to its capacity. */
     private static void sweepNuggetsIntoPurse(ServerPlayer player) {
         ItemStack purse = findPurse(player);
         if (purse == null) {
             return;
         }
+        int capacity = Yconomics.coinPurseCapacity(Yconomics.getCoinPurseTier(player));
+        CoinPurseContents contents = purse.getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
         Inventory inventory = player.getInventory();
-        int collected = 0;
+        boolean changed = false;
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             ItemStack stack = inventory.getItem(i);
-            if (stack.is(Items.GOLD_NUGGET)) {
-                collected += stack.getCount();
-                inventory.setItem(i, ItemStack.EMPTY);
+            if (!stack.isEmpty() && stack.is(Items.GOLD_NUGGET)) {
+                CoinPurseContents.InsertResult result = contents.insert(stack, capacity);
+                contents = result.contents();
+                changed |= result.inserted() > 0;
+                // insert() shrinks `stack` in place by whatever fit -- any leftover (purse already
+                // at capacity) is simply left sitting in this same slot, not lost.
+                if (stack.isEmpty()) {
+                    inventory.setItem(i, ItemStack.EMPTY);
+                }
             }
         }
-        if (collected > 0) {
-            purse.set(ModItems.NUGGET_COUNT, purse.getOrDefault(ModItems.NUGGET_COUNT, 0) + collected);
+        if (changed) {
+            purse.set(ModItems.COIN_PURSE_CONTENTS, contents);
         }
     }
 
@@ -216,19 +262,16 @@ public final class CoinPurseListener {
         if (purse == null) {
             return;
         }
-        int stored = purse.getOrDefault(ModItems.NUGGET_COUNT, 0);
-        if (stored <= 0) {
+        CoinPurseContents contents = purse.getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
+        if (contents.isEmpty()) {
             return;
         }
-        int remaining = stored;
-        while (remaining > 0) {
-            int chunk = Math.min(remaining, 64);
-            ItemStack nuggets = new ItemStack(Items.GOLD_NUGGET, chunk);
-            if (!player.getInventory().add(nuggets)) {
-                player.drop(nuggets, false);
+        for (ItemStack stack : contents.stacks()) {
+            ItemStack copy = stack.copy();
+            if (!player.getInventory().add(copy)) {
+                player.drop(copy, false);
             }
-            remaining -= chunk;
         }
-        purse.set(ModItems.NUGGET_COUNT, 0);
+        purse.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
     }
 }

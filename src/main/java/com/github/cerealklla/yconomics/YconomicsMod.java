@@ -7,6 +7,7 @@ import com.mojang.logging.LogUtils;
 import com.github.cerealklla.yconomics.bag.LootBagListener;
 import com.github.cerealklla.yconomics.currency.CoinPurseListener;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
+import com.github.cerealklla.yconomics.registration.ModAttachments;
 import com.github.cerealklla.yconomics.registration.ModEntities;
 import com.github.cerealklla.yconomics.registration.ModItems;
 import com.github.cerealklla.yconomics.registration.ModMenus;
@@ -30,6 +31,7 @@ public class YconomicsMod {
         ModItems.DATA_COMPONENTS.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
         ModMenus.MENU_TYPES.register(modEventBus);
+        ModAttachments.ATTACHMENT_TYPES.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(new CoinPurseListener());
         NeoForge.EVENT_BUS.register(new HostileMobDrops());
