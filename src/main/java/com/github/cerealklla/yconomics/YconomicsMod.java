@@ -4,12 +4,16 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import com.github.cerealklla.yconomics.currency.CoinPurseListener;
+import com.github.cerealklla.yconomics.mob.HostileMobDrops;
+import com.github.cerealklla.yconomics.registration.ModItems;
 import com.github.cerealklla.yconomics.registration.ModRecipes;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 // The value here must match the modId entry in META-INF/neoforge.mods.toml (sourced from mod_id in gradle.properties)
 @Mod(YconomicsMod.MODID)
@@ -19,6 +23,11 @@ public class YconomicsMod {
 
     public YconomicsMod(IEventBus modEventBus, ModContainer modContainer) {
         ModRecipes.RECIPE_SERIALIZERS.register(modEventBus);
+        ModItems.ITEMS.register(modEventBus);
+        ModItems.DATA_COMPONENTS.register(modEventBus);
+
+        NeoForge.EVENT_BUS.register(new CoinPurseListener());
+        NeoForge.EVENT_BUS.register(new HostileMobDrops());
 
         modEventBus.addListener(this::commonSetup);
     }
