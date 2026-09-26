@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fletcher/level_2/flint_nugget",
+                   "yconomics:fletcher/level_2/nugget_bow"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fletcher/level_3/nugget_crossbow",
+                   "yconomics:fletcher/level_3/feather_nugget"
+               ]
+}

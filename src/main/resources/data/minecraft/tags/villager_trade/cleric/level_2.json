@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cleric/level_2/nugget_lapis_lazuli",
+                   "yconomics:cleric/level_2/gold_ingot_nugget"
+               ]
+}

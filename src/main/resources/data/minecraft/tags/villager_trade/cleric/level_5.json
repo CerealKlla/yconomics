@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cleric/level_5/nugget_experience_bottle",
+                   "yconomics:cleric/level_5/nugget_nether_wart"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:librarian/level_2/nugget_bookshelf",
+                   "yconomics:librarian/level_2/nugget_lantern"
+               ]
+}

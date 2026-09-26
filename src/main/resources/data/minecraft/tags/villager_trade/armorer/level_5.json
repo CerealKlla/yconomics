@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:armorer/level_5/nugget_diamond_chestplate",
+                   "yconomics:armorer/level_5/nugget_shield"
+               ]
+}

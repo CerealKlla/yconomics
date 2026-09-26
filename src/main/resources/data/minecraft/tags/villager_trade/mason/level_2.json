@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:mason/level_2/clay_ball_nugget",
+                   "yconomics:mason/level_2/nugget_terracotta"
+               ]
+}

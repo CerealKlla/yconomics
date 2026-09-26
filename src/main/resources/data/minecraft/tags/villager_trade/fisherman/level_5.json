@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fisherman/level_5/nugget_pufferfish_bucket",
+                   "yconomics:fisherman/level_5/tropical_fish_nugget"
+               ]
+}

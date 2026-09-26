@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:weaponsmith/level_3/nugget_bell_ws",
+                   "yconomics:weaponsmith/level_3/flint_nugget_ws"
+               ]
+}

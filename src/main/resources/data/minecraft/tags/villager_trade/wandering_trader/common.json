@@ -1,0 +1,10 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:wandering_trader/common/nugget_oak_sapling",
+                   "yconomics:wandering_trader/common/nugget_sand",
+                   "yconomics:wandering_trader/common/nugget_glowstone_wt",
+                   "yconomics:wandering_trader/common/nugget_pumpkin_pie",
+                   "yconomics:wandering_trader/common/nugget_vine"
+               ]
+}

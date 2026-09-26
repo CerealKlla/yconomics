@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:librarian/level_5/nugget_enchanted_book_placeholder",
+                   "yconomics:librarian/level_5/nugget_glass_lib"
+               ]
+}

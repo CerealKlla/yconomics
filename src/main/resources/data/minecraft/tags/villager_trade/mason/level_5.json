@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:mason/level_5/nugget_dripstone_block",
+                   "yconomics:mason/level_5/nugget_polished_deepslate"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fisherman/level_3/nugget_oak_boat",
+                   "yconomics:fisherman/level_3/salmon_nugget"
+               ]
+}

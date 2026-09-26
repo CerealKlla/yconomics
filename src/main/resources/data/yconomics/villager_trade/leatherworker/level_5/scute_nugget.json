@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:turtle_scute",
+                  "count":  4
+              },
+    "gives":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  1
+              },
+    "max_uses":  16
+}

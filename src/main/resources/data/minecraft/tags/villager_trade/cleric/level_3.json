@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cleric/level_3/nugget_ender_pearl",
+                   "yconomics:cleric/level_3/rabbit_foot_nugget"
+               ]
+}

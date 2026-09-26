@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:armorer/level_2/chain_nugget",
+                   "yconomics:armorer/level_2/nugget_iron_leggings"
+               ]
+}

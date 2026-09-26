@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:toolsmith/level_4/diamond_nugget_ts",
+                   "yconomics:toolsmith/level_4/nugget_diamond_axe"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fisherman/level_2/nugget_cooked_cod",
+                   "yconomics:fisherman/level_2/coal_nugget"
+               ]
+}

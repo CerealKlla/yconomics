@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:shepherd/level_1/wool_nugget",
+                   "yconomics:shepherd/level_1/nugget_shears"
+               ]
+}

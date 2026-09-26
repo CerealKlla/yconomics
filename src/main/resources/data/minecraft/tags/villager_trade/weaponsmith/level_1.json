@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:weaponsmith/level_1/coal_nugget_ws",
+                   "yconomics:weaponsmith/level_1/nugget_iron_sword"
+               ]
+}

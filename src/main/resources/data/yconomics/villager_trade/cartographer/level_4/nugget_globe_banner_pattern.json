@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  6
+              },
+    "gives":  {
+                  "id":  "minecraft:globe_banner_pattern",
+                  "count":  1
+              },
+    "max_uses":  16
+}

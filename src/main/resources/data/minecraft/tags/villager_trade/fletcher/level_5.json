@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fletcher/level_5/nugget_spyglass",
+                   "yconomics:fletcher/level_5/nugget_target"
+               ]
+}

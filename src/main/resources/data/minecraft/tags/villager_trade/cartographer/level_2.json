@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cartographer/level_2/glass_pane_nugget",
+                   "yconomics:cartographer/level_2/nugget_compass"
+               ]
+}

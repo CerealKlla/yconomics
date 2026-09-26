@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:toolsmith/level_3/nugget_flint_and_steel",
+                   "yconomics:toolsmith/level_3/nugget_iron_hoe"
+               ]
+}

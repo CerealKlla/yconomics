@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:shepherd/level_3/nugget_white_bed",
+                   "yconomics:shepherd/level_3/nugget_painting"
+               ]
+}

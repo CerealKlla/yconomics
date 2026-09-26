@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cartographer/level_4/nugget_white_banner",
+                   "yconomics:cartographer/level_4/nugget_globe_banner_pattern"
+               ]
+}

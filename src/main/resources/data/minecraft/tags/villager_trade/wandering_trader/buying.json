@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:wandering_trader/buying/nugget_for_coral_block",
+                   "yconomics:wandering_trader/buying/nugget_for_cactus"
+               ]
+}

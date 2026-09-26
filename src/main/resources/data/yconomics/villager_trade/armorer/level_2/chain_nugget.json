@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:chainmail_helmet",
+                  "count":  1
+              },
+    "gives":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  2
+              },
+    "max_uses":  16
+}

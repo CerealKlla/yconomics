@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:toolsmith/level_1/iron_nugget_ts",
+                   "yconomics:toolsmith/level_1/nugget_stone_pickaxe"
+               ]
+}

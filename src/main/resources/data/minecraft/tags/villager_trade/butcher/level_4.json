@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:butcher/level_4/sweet_berries_nugget",
+                   "yconomics:butcher/level_4/nugget_dried_kelp_block"
+               ]
+}

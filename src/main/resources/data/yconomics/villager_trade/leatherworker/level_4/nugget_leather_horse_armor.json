@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  5
+              },
+    "gives":  {
+                  "id":  "minecraft:leather_horse_armor",
+                  "count":  1
+              },
+    "max_uses":  16
+}

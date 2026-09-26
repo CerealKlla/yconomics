@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:weaponsmith/level_4/diamond_nugget_ws",
+                   "yconomics:weaponsmith/level_4/nugget_diamond_sword"
+               ]
+}

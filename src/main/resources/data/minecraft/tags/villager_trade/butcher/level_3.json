@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:butcher/level_3/rabbit_hide_nugget",
+                   "yconomics:butcher/level_3/nugget_rabbit_stew"
+               ]
+}

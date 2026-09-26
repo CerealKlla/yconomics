@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:shepherd/level_5/nugget_flower_banner_pattern",
+                   "yconomics:shepherd/level_5/nugget_wool_bulk"
+               ]
+}

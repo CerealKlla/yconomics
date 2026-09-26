@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:librarian/level_3/nugget_name_tag",
+                   "yconomics:librarian/level_3/ink_sac_nugget_lib"
+               ]
+}

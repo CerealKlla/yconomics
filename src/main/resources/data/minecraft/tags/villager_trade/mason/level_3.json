@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:mason/level_3/nugget_chiseled_stone_bricks",
+                   "yconomics:mason/level_3/granite_nugget"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cleric/level_1/rotten_flesh_nugget",
+                   "yconomics:cleric/level_1/nugget_redstone"
+               ]
+}

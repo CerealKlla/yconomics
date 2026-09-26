@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cartographer/level_5/nugget_ominous_bottle",
+                   "yconomics:cartographer/level_5/nugget_glass"
+               ]
+}

@@ -1,0 +1,8 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:wandering_trader/uncommon/nugget_lead",
+                   "yconomics:wandering_trader/uncommon/nugget_pufferfish_bucket_wt",
+                   "yconomics:wandering_trader/uncommon/nugget_nautilus_shell"
+               ]
+}

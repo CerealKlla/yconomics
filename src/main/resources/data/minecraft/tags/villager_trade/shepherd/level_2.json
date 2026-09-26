@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:shepherd/level_2/nugget_black_dye",
+                   "yconomics:shepherd/level_2/nugget_white_dye"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cartographer/level_3/nugget_item_frame",
+                   "yconomics:cartographer/level_3/ink_sac_nugget"
+               ]
+}

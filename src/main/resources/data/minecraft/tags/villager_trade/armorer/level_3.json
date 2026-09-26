@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:armorer/level_3/lava_bucket_nugget",
+                   "yconomics:armorer/level_3/nugget_iron_chestplate"
+               ]
+}

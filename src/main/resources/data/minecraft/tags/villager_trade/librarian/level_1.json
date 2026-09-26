@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:librarian/level_1/paper_nugget_lib",
+                   "yconomics:librarian/level_1/nugget_book"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cleric/level_4/nugget_glowstone",
+                   "yconomics:cleric/level_4/glass_bottle_nugget"
+               ]
+}

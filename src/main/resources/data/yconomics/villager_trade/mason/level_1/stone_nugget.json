@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:stone",
+                  "count":  20
+              },
+    "gives":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  1
+              },
+    "max_uses":  16
+}

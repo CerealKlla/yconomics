@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:armorer/level_4/diamond_nugget",
+                   "yconomics:armorer/level_4/nugget_diamond_boots"
+               ]
+}

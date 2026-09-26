@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:butcher/level_5/nugget_cooked_beef",
+                   "yconomics:butcher/level_5/beef_nugget"
+               ]
+}

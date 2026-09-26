@@ -1,0 +1,11 @@
+{
+    "wants":  {
+                  "id":  "minecraft:tube_coral_block",
+                  "count":  2
+              },
+    "gives":  {
+                  "id":  "minecraft:gold_nugget",
+                  "count":  1
+              },
+    "max_uses":  16
+}

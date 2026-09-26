@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:leatherworker/level_4/nugget_leather_helmet",
+                   "yconomics:leatherworker/level_4/nugget_leather_horse_armor"
+               ]
+}

@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:fisherman/level_4/nugget_bucket",
+                   "yconomics:fisherman/level_4/nugget_barrel"
+               ]
+}

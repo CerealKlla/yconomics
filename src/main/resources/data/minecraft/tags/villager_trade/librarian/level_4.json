@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:librarian/level_4/nugget_compass_lib",
+                   "yconomics:librarian/level_4/nugget_clock"
+               ]
+}

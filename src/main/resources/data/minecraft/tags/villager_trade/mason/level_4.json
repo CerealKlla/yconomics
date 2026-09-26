@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:mason/level_4/nugget_quartz_block",
+                   "yconomics:mason/level_4/quartz_nugget"
+               ]
+}

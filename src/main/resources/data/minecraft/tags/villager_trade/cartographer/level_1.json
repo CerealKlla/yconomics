@@ -1,0 +1,7 @@
+{
+    "replace":  true,
+    "values":  [
+                   "yconomics:cartographer/level_1/paper_nugget",
+                   "yconomics:cartographer/level_1/nugget_map"
+               ]
+}
