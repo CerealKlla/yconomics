@@ -4,8 +4,10 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import com.github.cerealklla.yconomics.bag.LootBagListener;
 import com.github.cerealklla.yconomics.currency.CoinPurseListener;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
+import com.github.cerealklla.yconomics.registration.ModEntities;
 import com.github.cerealklla.yconomics.registration.ModItems;
 import com.github.cerealklla.yconomics.registration.ModRecipes;
 
@@ -25,9 +27,11 @@ public class YconomicsMod {
         ModRecipes.RECIPE_SERIALIZERS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModItems.DATA_COMPONENTS.register(modEventBus);
+        ModEntities.ENTITIES.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(new CoinPurseListener());
         NeoForge.EVENT_BUS.register(new HostileMobDrops());
+        NeoForge.EVENT_BUS.register(new LootBagListener());
 
         modEventBus.addListener(this::commonSetup);
     }
