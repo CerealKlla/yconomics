@@ -191,14 +191,30 @@ public final class CoinPurseListener {
         }
     }
 
-    /** Adds a fresh, empty purse if the player doesn't already have one -- never touches an existing one. */
+    /**
+     * Adds a fresh, empty purse if the player doesn't already have one -- never touches an
+     * existing one. Placed directly into {@link #PURSE_HOME_SLOT} when that slot is free (the
+     * common case -- respawn/first-login inventories are empty), rather than through {@code
+     * Inventory#add}, which fills the hotbar first. That previously left a freshly-respawned
+     * player's purse sitting in hotbar slot 0 -- which is also the default *selected* slot, so it
+     * visibly appeared "in hand" -- and {@link #enforcePurseHomeSlot}'s own "don't yank it out of
+     * the player's hand while they're actively holding it" exception (a deliberate fix for a
+     * different real bug, see that method's doc) meant it could never be corrected afterward,
+     * since the game has no way to distinguish "the player deliberately selected this slot" from
+     * "this happens to be the default selected slot." Fixed 2026-09-26 after a real playtest
+     * report; see decisions.md.
+     */
     private static void ensurePurse(ServerPlayer player) {
-        if (findPurse(player) == null) {
-            ItemStack fresh = new ItemStack(ModItems.COIN_PURSE.get());
-            fresh.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
-            if (!player.getInventory().add(fresh)) {
-                player.drop(fresh, false); // Best-effort: only reached with a completely full inventory.
-            }
+        if (findPurse(player) != null) {
+            return;
+        }
+        ItemStack fresh = new ItemStack(ModItems.COIN_PURSE.get());
+        fresh.set(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
+        Inventory inventory = player.getInventory();
+        if (inventory.getItem(PURSE_HOME_SLOT).isEmpty()) {
+            inventory.setItem(PURSE_HOME_SLOT, fresh);
+        } else if (!inventory.add(fresh)) {
+            player.drop(fresh, false); // Best-effort: only reached with a completely full inventory.
         }
     }
 
