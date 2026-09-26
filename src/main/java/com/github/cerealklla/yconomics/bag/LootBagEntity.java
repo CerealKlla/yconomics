@@ -141,6 +141,15 @@ public class LootBagEntity extends Entity implements MenuProvider {
         return false; // Immune -- no explosion/fire-destroys-the-bag-and-loses-everything edge case to handle.
     }
 
+    // Entity#isPickable() defaults to false -- without this override, the entity is invisible to
+    // the game's own crosshair/interaction raycast entirely (confirmed the hard way: a real
+    // playtest report of "there's a nametag but nothing to actually click on," see decisions.md
+    // 2026-09-25). This is what makes right-click targeting -- and so #interact -- reachable at all.
+    @Override
+    public boolean isPickable() {
+        return true;
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         // No synced data needed -- nothing about a bag's appearance depends on its contents, and
