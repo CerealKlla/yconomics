@@ -53,6 +53,8 @@ Newly flagged, ownership undecided: an NPC gossip/paid-tips mechanic (Section 5)
 
 **Fixed same day: the decorator text never actually drew** — a live playtest report (neither line visible at all) turned out to be a real bug, not a wiring problem: `TIER_COLOR`/`NUGGET_COLOR` were bare RGB ints (`0xFFD700`/`0xFFFFFF`), which pack to alpha=0 as 32-bit ARGB, and `GuiGraphicsExtractor#text` silently skips drawing when alpha is 0. Confirmed via temporary diagnostic logging that `render()` itself was firing correctly every frame before finding the real cause. Fixed with fully-opaque packed values (`0xFFFFD700`/`0xFFFFFFFF`). `./gradlew build` green; **live re-confirmation still pending.**
 
+**New debug commands: `/yconomics purse tier`/`purse add`, 2026-09-26** (see [context/decisions.md](context/decisions.md)) — added after investigating a "Coin Purse tier stuck at T0 after maxing Merchant XP" report: not a bug, `MerchantListener#onTrade` only recomputes tier on an actual completed trade, so a debug-XP-boosted player correctly sees a stale tier until their next real trade. New `debug.DebugCommands` (mirrors Lyfe's own debug-command precedent) lets tier/nugget-count be set directly for testing the decorator's rendering at any value without grinding real trades.
+
 Next: **live re-confirmation of the Coin Purse decorator fix above**, plus the bag's UI polish and the new Merchant skill's price bonus/XP (see lyfe's CLAUDE.md) — then a full pass over everything built this session together — the gambling recipe, the full currency swap, hostile mob drops, the Coin Purse, and the dropped-item bag (the user's own stated test plan).
 
 See [context/classes/](context/classes/) for per-class reference.

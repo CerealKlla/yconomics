@@ -6,6 +6,7 @@ import com.mojang.logging.LogUtils;
 
 import com.github.cerealklla.yconomics.bag.LootBagListener;
 import com.github.cerealklla.yconomics.currency.CoinPurseListener;
+import com.github.cerealklla.yconomics.debug.DebugCommands;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
 import com.github.cerealklla.yconomics.registration.ModAttachments;
 import com.github.cerealklla.yconomics.registration.ModEntities;
@@ -18,6 +19,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 // The value here must match the modId entry in META-INF/neoforge.mods.toml (sourced from mod_id in gradle.properties)
 @Mod(YconomicsMod.MODID)
@@ -36,6 +38,7 @@ public class YconomicsMod {
         NeoForge.EVENT_BUS.register(new CoinPurseListener());
         NeoForge.EVENT_BUS.register(new HostileMobDrops());
         NeoForge.EVENT_BUS.register(new LootBagListener());
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
         modEventBus.addListener(this::commonSetup);
     }
