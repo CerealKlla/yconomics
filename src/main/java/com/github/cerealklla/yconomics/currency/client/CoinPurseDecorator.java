@@ -35,8 +35,14 @@ import net.neoforged.neoforge.client.IItemDecorator;
  */
 public final class CoinPurseDecorator implements IItemDecorator {
 
-    private static final int TIER_COLOR = 0xFFD700; // gold
-    private static final int NUGGET_COLOR = 0xFFFFFF; // white, matches vanilla's own count color
+    // Must include the alpha byte -- GuiGraphicsExtractor#text silently draws nothing at all if
+    // ARGB.alpha(color) == 0, and a bare 0xFFD700/0xFFFFFF packs to alpha=0x00 as a 32-bit int (the
+    // top byte is alpha, not part of the RGB value). This was the real cause of the tier/count text
+    // never appearing at all -- render() was firing correctly the whole time (confirmed via
+    // temporary diagnostic logging, since removed), it just drew fully transparent text every
+    // frame. See decisions.md, 2026-09-26.
+    private static final int TIER_COLOR = 0xFFFFD700; // opaque gold
+    private static final int NUGGET_COLOR = 0xFFFFFFFF; // opaque white, matches vanilla's own count color
 
     @Override
     public boolean render(GuiGraphicsExtractor guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {
