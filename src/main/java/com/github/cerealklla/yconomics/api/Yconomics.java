@@ -14,6 +14,7 @@ import com.github.cerealklla.yconomics.registration.ModAttachments;
 import com.github.cerealklla.yconomics.registration.ModItems;
 import com.github.cerealklla.yconomics.shop.PlotShop;
 import com.github.cerealklla.yconomics.shop.ShopListing;
+import com.github.cerealklla.yconomics.shop.ShopPricing;
 import com.github.cerealklla.yconomics.shop.ShopResource;
 import com.github.cerealklla.yconomics.shop.ShopTransferEngine;
 import com.github.cerealklla.yconomics.storage.BillSavedData;
@@ -178,9 +179,13 @@ public final class Yconomics {
         return getPlotShopFor(level.getServer(), ownerContext);
     }
 
-    /** Sets (replacing any existing listing for the same resource) or adds a listing's price. */
+    /**
+     * Sets (replacing any existing listing for the same resource) or adds a listing's price --
+     * {@code pricePerUnit} is clamped up to {@link ShopPricing#MIN_SELL_PRICE} if set any lower
+     * (2026-10-08 user spec: "no shop should ever sell an item for less than 2 gold").
+     */
     public static Optional<PlotShop> setListingPrice(MinecraftServer server, UUID shopId, ShopResource resource, int pricePerUnit) {
-        return shopData(server).setListingPrice(shopId, resource, pricePerUnit);
+        return shopData(server).setListingPrice(shopId, resource, ShopPricing.clampSellPrice(pricePerUnit));
     }
 
     public static Optional<PlotShop> setListingPrice(ServerLevel level, UUID shopId, ShopResource resource, int pricePerUnit) {
@@ -239,6 +244,51 @@ public final class Yconomics {
             BillTransferEngine.deposit(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsCharged));
         }
         return new PurchaseResult(itemsReceived, nuggetsCharged);
+    }
+
+    /**
+     * Mirror of {@link PurchaseResult} for the reverse direction (2026-10-08, "I want to implement
+     * them buying items as well") -- {@code itemsSold} is how many units were actually taken (0 if
+     * the shop couldn't afford it or no listing covers {@code itemId}), {@code nuggetsReceived} is
+     * what the seller is owed, before any per-player Merchant-skill bonus (applied by the caller --
+     * see {@code ShopPricing}'s own doc on why that stays separate).
+     */
+    public record SellResult(int itemsSold, int nuggetsReceived) {
+    }
+
+    /**
+     * Sells up to {@code quantity} units of {@code itemId} to {@code shopId} -- the reverse of
+     * {@link #purchaseFromShop}, reusing the exact same listing lookup. {@code resource} identifies
+     * which existing listing this item falls under (a shop only ever buys back something it already
+     * sells, per the user's own spec -- this is not an open "sell anything" mechanic); {@code itemId}
+     * is the concrete item actually being deposited (a tag-based listing like "any log" can cover
+     * several different real items, so the caller -- which has the player's actual held stack --
+     * resolves this, same division of responsibility as {@code purchaseFromShop}'s {@code
+     * itemsReceived}). Price per unit is {@link ShopPricing#deriveBuyPrice} of the listing's own sell
+     * price -- never separately configurable, so it can never drift out of the required 60%
+     * relationship. All-or-nothing: {@code 0} if the shop's {@code paymentBoxes} can't cover the full
+     * {@code quantity} at once (no partial-fill support, unlike the buy direction -- a shop simply
+     * isn't open for business on an item it can't currently afford).
+     */
+    public static SellResult sellToShop(ServerLevel level, UUID shopId, ShopResource resource, Identifier itemId, int quantity,
+                                         List<Container> stockBoxes, List<Container> paymentBoxes) {
+        Optional<PlotShop> shop = getPlotShop(level, shopId);
+        if (shop.isEmpty()) {
+            return new SellResult(0, 0);
+        }
+        Optional<ShopListing> listing = shop.get().listings().stream()
+                .filter(l -> l.resource().key().equals(resource.key()))
+                .findFirst();
+        if (listing.isEmpty() || quantity <= 0) {
+            return new SellResult(0, 0);
+        }
+        int nuggetsOwed = quantity * ShopPricing.deriveBuyPrice(listing.get().pricePerUnit());
+        if (!BillTransferEngine.canSatisfy(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed))) {
+            return new SellResult(0, 0);
+        }
+        BillTransferEngine.drain(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed));
+        BillTransferEngine.deposit(stockBoxes, Map.of(itemId, quantity));
+        return new SellResult(quantity, nuggetsOwed);
     }
 
     // Generic currency debit (added 2026-10-05 for the Shop purchase flow above) -- the facade's

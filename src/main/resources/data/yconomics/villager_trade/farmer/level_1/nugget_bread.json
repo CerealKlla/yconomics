@@ -1,7 +1,7 @@
 {
   "wants": {
     "id": "minecraft:gold_nugget",
-    "count": 1
+    "count": 2
   },
   "gives": {
     "id": "minecraft:bread",

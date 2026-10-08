@@ -1,0 +1,11 @@
+{
+  "wants": {
+    "id": "minecraft:chiseled_stone_bricks",
+    "count": 4
+  },
+  "gives": {
+    "id": "minecraft:gold_nugget",
+    "count": 1
+  },
+  "max_uses": 16
+}
