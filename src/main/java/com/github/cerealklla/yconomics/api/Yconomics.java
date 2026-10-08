@@ -251,9 +251,12 @@ public final class Yconomics {
      * them buying items as well") -- {@code itemsSold} is how many units were actually taken (0 if
      * the shop couldn't afford it or no listing covers {@code itemId}), {@code nuggetsReceived} is
      * what the seller is owed, before any per-player Merchant-skill bonus (applied by the caller --
-     * see {@code ShopPricing}'s own doc on why that stays separate).
+     * see {@code ShopPricing}'s own doc on why that stays separate). {@code sellPricePerUnit} is the
+     * listing's own sell price this was derived from -- the caller needs it (not just the already-
+     * derived buy price baked into {@code nuggetsReceived}) to compute {@link
+     * ShopPricing#effectiveSellPayout}, which takes the sell price itself, not the buy price.
      */
-    public record SellResult(int itemsSold, int nuggetsReceived) {
+    public record SellResult(int itemsSold, int nuggetsReceived, int sellPricePerUnit) {
     }
 
     /**
@@ -274,21 +277,22 @@ public final class Yconomics {
                                          List<Container> stockBoxes, List<Container> paymentBoxes) {
         Optional<PlotShop> shop = getPlotShop(level, shopId);
         if (shop.isEmpty()) {
-            return new SellResult(0, 0);
+            return new SellResult(0, 0, 0);
         }
         Optional<ShopListing> listing = shop.get().listings().stream()
                 .filter(l -> l.resource().key().equals(resource.key()))
                 .findFirst();
         if (listing.isEmpty() || quantity <= 0) {
-            return new SellResult(0, 0);
+            return new SellResult(0, 0, 0);
         }
-        int nuggetsOwed = quantity * ShopPricing.deriveBuyPrice(listing.get().pricePerUnit());
+        int sellPricePerUnit = listing.get().pricePerUnit();
+        int nuggetsOwed = quantity * ShopPricing.deriveBuyPrice(sellPricePerUnit);
         if (!BillTransferEngine.canSatisfy(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed))) {
-            return new SellResult(0, 0);
+            return new SellResult(0, 0, 0);
         }
         BillTransferEngine.drain(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed));
         BillTransferEngine.deposit(stockBoxes, Map.of(itemId, quantity));
-        return new SellResult(quantity, nuggetsOwed);
+        return new SellResult(quantity, nuggetsOwed, sellPricePerUnit);
     }
 
     // Generic currency debit (added 2026-10-05 for the Shop purchase flow above) -- the facade's
