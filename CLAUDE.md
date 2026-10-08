@@ -57,4 +57,6 @@ Newly flagged, ownership undecided: an NPC gossip/paid-tips mechanic (Section 5)
 
 Next: **live re-confirmation of the Coin Purse decorator fix above**, plus the bag's UI polish and the new Merchant skill's price bonus/XP (see lyfe's CLAUDE.md) — then a full pass over everything built this session together — the gambling recipe, the full currency swap, hostile mob drops, the Coin Purse, and the dropped-item bag (the user's own stated test plan).
 
+**Large cross-mod design captured 2026-09-29, not yet implemented** (see [context/design-document.md](context/design-document.md)'s new Section 5a, and [context/decisions.md](context/decisions.md)) — this mod is expected to back Settlemynts' new Plot Config Sign's "Enter Shop"/"Manage Shop" buttons (v1 deliberately infinite money/goods, no real per-shop inventory yet) once a shop-registration mechanism exists, and to eventually build the generic ID-keyed account-transfer primitive first described in Settlemynts' own design doc Section 13a (now with Guardhouse gold upkeep as a second confirmed future consumer alongside tax/rent). Pending prioritization — do not start building without further direction.
+
 See [context/classes/](context/classes/) for per-class reference.

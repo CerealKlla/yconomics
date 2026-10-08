@@ -1,16 +1,31 @@
 package com.github.cerealklla.yconomics.debug;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 
 import com.github.cerealklla.yconomics.api.Yconomics;
+import com.github.cerealklla.yconomics.bills.BillProcessor;
+import com.github.cerealklla.yconomics.bills.DayChangeTracker;
+import com.github.cerealklla.yconomics.bills.RecurringBill;
+import com.github.cerealklla.yconomics.bills.RecurringBill.BoxRef;
 import com.github.cerealklla.yconomics.currency.CoinPurseContents;
 import com.github.cerealklla.yconomics.registration.ModItems;
+import com.github.cerealklla.yconomics.storage.BillSavedData;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -52,9 +67,72 @@ public final class DebugCommands {
                                 IntegerArgumentType.getInteger(ctx, "count"), playerOrSelf(ctx.getSource())))
                         .then(addWithTarget));
 
+        var registerWithPeriod = Commands.argument("periodDays", IntegerArgumentType.integer(1))
+                .executes(ctx -> registerBill(ctx.getSource(),
+                        BlockPosArgument.getLoadedBlockPos(ctx, "sourcePos"),
+                        BlockPosArgument.getLoadedBlockPos(ctx, "destPos"),
+                        StringArgumentType.getString(ctx, "itemId"),
+                        IntegerArgumentType.getInteger(ctx, "qty"),
+                        IntegerArgumentType.getInteger(ctx, "periodDays")));
+        var registerQty = Commands.argument("qty", IntegerArgumentType.integer(1))
+                .executes(ctx -> registerBill(ctx.getSource(),
+                        BlockPosArgument.getLoadedBlockPos(ctx, "sourcePos"),
+                        BlockPosArgument.getLoadedBlockPos(ctx, "destPos"),
+                        StringArgumentType.getString(ctx, "itemId"),
+                        IntegerArgumentType.getInteger(ctx, "qty"), 1L))
+                .then(registerWithPeriod);
+        var registerItemId = Commands.argument("itemId", StringArgumentType.string()).then(registerQty);
+        var registerDestPos = Commands.argument("destPos", BlockPosArgument.blockPos()).then(registerItemId);
+        var registerSourcePos = Commands.argument("sourcePos", BlockPosArgument.blockPos()).then(registerDestPos);
+        var billRegister = Commands.literal("register").then(registerSourcePos);
+
+        var billForceProcess = Commands.literal("forceprocess")
+                .then(Commands.argument("billId", StringArgumentType.string())
+                        .executes(ctx -> forceProcess(ctx.getSource(), StringArgumentType.getString(ctx, "billId"))));
+
         dispatcher.register(Commands.literal("yconomics")
                 .requires(source -> true) // deliberately no permission gate -- see class doc
-                .then(Commands.literal("purse").then(tier).then(add)));
+                .then(Commands.literal("purse").then(tier).then(add))
+                .then(Commands.literal("bill").then(billRegister).then(billForceProcess)));
+    }
+
+    /**
+     * DEBUG ONLY -- a single source/destination box, purely to exercise {@code bills.BillProcessor}
+     * without needing Settlemynts' own (not-yet-built) UI. Each box gets a freshly minted {@link
+     * UUID} -- identity doesn't matter for this manual test, only the position does (see {@code
+     * RecurringBill}'s own class doc on why positions, not Cartographyr lookups, drive processing).
+     */
+    private static int registerBill(CommandSourceStack source, BlockPos sourcePos, BlockPos destPos,
+                                      String itemId, int qty, long periodDays) {
+        Identifier item = Identifier.parse(itemId);
+        BoxRef sourceBox = new BoxRef(UUID.randomUUID(), GlobalPos.of(source.getLevel().dimension(), sourcePos));
+        BoxRef destBox = new BoxRef(UUID.randomUUID(), GlobalPos.of(source.getLevel().dimension(), destPos));
+        UUID billId = Yconomics.registerRecurringBill(source.getServer(), List.of(sourceBox), List.of(destBox),
+                Map.of(item, qty), periodDays, Optional.empty());
+        source.sendSuccess(() -> Component.literal("Registered bill " + billId + " (" + qty + "x " + itemId + " every "
+                + periodDays + " day(s))."), true);
+        return 1;
+    }
+
+    private static int forceProcess(CommandSourceStack source, String billIdRaw) {
+        UUID billId;
+        try {
+            billId = UUID.fromString(billIdRaw);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.literal("Not a valid bill id: " + billIdRaw));
+            return 0;
+        }
+        Optional<RecurringBill> bill = Yconomics.getRecurringBill(source.getServer(), billId);
+        if (bill.isEmpty()) {
+            source.sendFailure(Component.literal("No bill with id " + billId));
+            return 0;
+        }
+        BillSavedData data = source.getServer().getDataStorage().computeIfAbsent(BillSavedData.TYPE);
+        long day = DayChangeTracker.dayNumber(source.getServer().overworld().getOverworldClockTime());
+        var outcome = BillProcessor.process(source.getServer(), bill.get());
+        data.markProcessed(billId, day, outcome);
+        source.sendSuccess(() -> Component.literal("Bill " + billId + " processed: " + outcome), true);
+        return 1;
     }
 
     private static ServerPlayer playerOrSelf(CommandSourceStack source) {

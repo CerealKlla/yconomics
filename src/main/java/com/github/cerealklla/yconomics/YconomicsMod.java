@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 import com.github.cerealklla.yconomics.bag.LootBagListener;
+import com.github.cerealklla.yconomics.bills.BillProcessingTicker;
 import com.github.cerealklla.yconomics.currency.CoinPurseListener;
 import com.github.cerealklla.yconomics.debug.DebugCommands;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
@@ -38,6 +39,7 @@ public class YconomicsMod {
         NeoForge.EVENT_BUS.register(new CoinPurseListener());
         NeoForge.EVENT_BUS.register(new HostileMobDrops());
         NeoForge.EVENT_BUS.register(new LootBagListener());
+        NeoForge.EVENT_BUS.register(new BillProcessingTicker());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
         modEventBus.addListener(this::commonSetup);
