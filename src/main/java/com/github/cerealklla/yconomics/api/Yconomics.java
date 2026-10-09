@@ -232,7 +232,7 @@ public final class Yconomics {
             return new PurchaseResult(List.of(), 0);
         }
         Optional<ShopListing> listing = shop.get().listings().stream()
-                .filter(l -> l.resource().key().equals(resource.key()))
+                .filter(l -> l.resource().coversSameListingAs(resource))
                 .findFirst();
         if (listing.isEmpty()) {
             return new PurchaseResult(List.of(), 0);
@@ -280,7 +280,7 @@ public final class Yconomics {
             return new SellResult(0, 0, 0);
         }
         Optional<ShopListing> listing = shop.get().listings().stream()
-                .filter(l -> l.resource().key().equals(resource.key()))
+                .filter(l -> l.resource().coversSameListingAs(resource))
                 .findFirst();
         if (listing.isEmpty() || quantity <= 0) {
             return new SellResult(0, 0, 0);

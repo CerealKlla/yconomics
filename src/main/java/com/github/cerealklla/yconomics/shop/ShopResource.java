@@ -62,4 +62,31 @@ public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> item
     public Identifier key() {
         return tag.map(TagKey::location).orElseGet(itemId::get);
     }
+
+    /**
+     * Does {@code this} and {@code other} refer to the same real listing -- added 2026-10-09, real
+     * report: a tag-based cost search (Settlemynts' "Logs," {@code generic_wood}) never found a
+     * listing a Manage Shop screen had created for a concrete item (e.g. {@code oak_log}, since a box
+     * slot is always a concrete stack, never a tag), because the two call sites in this class used
+     * to compare {@link #key()} directly -- a tag's key can never equal a different item's key, full
+     * stop, even though the item plainly falls under that tag. {@link #key()} itself is unchanged
+     * (still used for plain grouping where both sides are already known to be the same kind); this is
+     * the listing-lookup-specific comparison that also handles one side being a tag and the other a
+     * concrete item.
+     */
+    public boolean coversSameListingAs(ShopResource other) {
+        if (tag.isPresent() && other.tag.isPresent()) {
+            return tag.get().equals(other.tag.get());
+        }
+        if (itemId.isPresent() && other.itemId.isPresent()) {
+            return itemId.get().equals(other.itemId.get());
+        }
+        if (tag.isPresent() && other.itemId.isPresent()) {
+            return matches(new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(other.itemId.get())));
+        }
+        if (itemId.isPresent() && other.tag.isPresent()) {
+            return other.matches(new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(itemId.get())));
+        }
+        return false;
+    }
 }
