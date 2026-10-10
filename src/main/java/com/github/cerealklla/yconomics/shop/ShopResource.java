@@ -27,11 +27,12 @@ import net.minecraft.world.item.ItemStack;
  * MC version's data-pack tag folders are singular -- {@code data/<ns>/tags/item/<path>.json}, not
  * plural {@code tags/items/}. A plural folder silently loads as an always-empty tag, no error.
  */
-public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> itemId) {
+public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> itemId, Optional<String> customName) {
 
     public static final Codec<ShopResource> CODEC = RecordCodecBuilder.create(i -> i.group(
             TagKey.codec(Registries.ITEM).optionalFieldOf("tag").forGetter(ShopResource::tag),
-            Identifier.CODEC.optionalFieldOf("item_id").forGetter(ShopResource::itemId)
+            Identifier.CODEC.optionalFieldOf("item_id").forGetter(ShopResource::itemId),
+            Codec.STRING.optionalFieldOf("custom_name").forGetter(ShopResource::customName)
     ).apply(i, ShopResource::new));
 
     public ShopResource {
@@ -41,11 +42,21 @@ public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> item
     }
 
     public static ShopResource ofTag(TagKey<Item> tag) {
-        return new ShopResource(Optional.of(tag), Optional.empty());
+        return new ShopResource(Optional.of(tag), Optional.empty(), Optional.empty());
     }
 
     public static ShopResource ofItem(Identifier itemId) {
-        return new ShopResource(Optional.empty(), Optional.of(itemId));
+        return new ShopResource(Optional.empty(), Optional.of(itemId), Optional.empty());
+    }
+
+    /**
+     * A listing for one exact crafted-quality variant of a concrete item (2026-10-10, for
+     * Settlemynts' per-quality Shop listings -- e.g. two different "Bread" stacks baked at
+     * different Cook/structure quality, each independently priced) -- {@code customName} is the
+     * stack's real baked display text (e.g. {@code "[3.75] (T5) - Bread"}), matched exactly.
+     */
+    public static ShopResource ofExactItem(Identifier itemId, String customName) {
+        return new ShopResource(Optional.empty(), Optional.of(itemId), Optional.of(customName));
     }
 
     public boolean matches(ItemStack stack) {
@@ -55,10 +66,13 @@ public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> item
         if (tag.isPresent()) {
             return stack.is(tag.get());
         }
-        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(itemId.get());
+        if (!net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(itemId.get())) {
+            return false;
+        }
+        return customName.isEmpty() || customName.get().equals(stack.getHoverName().getString());
     }
 
-    /** A stable key for this resource, for grouping/lookup -- the tag's own id, or the plain item id. */
+    /** A stable key for this resource, for grouping/lookup -- the tag's own id, or the plain item id. Ignores {@link #customName} -- see {@link #sameVariantAs} for an exact-variant-aware comparison. */
     public Identifier key() {
         return tag.map(TagKey::location).orElseGet(itemId::get);
     }
@@ -73,6 +87,12 @@ public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> item
      * (still used for plain grouping where both sides are already known to be the same kind); this is
      * the listing-lookup-specific comparison that also handles one side being a tag and the other a
      * concrete item.
+     *
+     * <p>Deliberately ignores {@link #customName} (2026-10-10) -- this is used to find "the listing a
+     * generic buy/sell request should transact against," which must keep matching any quality variant
+     * of an item (e.g. a generic Planned Inventory "Bread" target buying/selling any Bread it finds) --
+     * see {@link #sameVariantAs} for the exact-variant comparison {@code ShopSavedData} needs instead,
+     * for adding/removing one specific listing without colliding with a sibling variant's own listing.
      */
     public boolean coversSameListingAs(ShopResource other) {
         if (tag.isPresent() && other.tag.isPresent()) {
@@ -88,5 +108,15 @@ public record ShopResource(Optional<TagKey<Item>> tag, Optional<Identifier> item
             return other.matches(new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(itemId.get())));
         }
         return false;
+    }
+
+    /**
+     * Exact-variant equality (2026-10-10, added alongside {@link #ofExactItem}) -- {@code
+     * ShopSavedData#setListingPrice}/{@code #removeListing} use this (not {@link #key()}) so two
+     * different quality variants of the same item (e.g. "Bread [1.0]" and "Bread [3.75]") are always
+     * treated as two distinct listings, never silently overwriting/removing each other.
+     */
+    public boolean sameVariantAs(ShopResource other) {
+        return tag.equals(other.tag) && itemId.equals(other.itemId) && customName.equals(other.customName);
     }
 }

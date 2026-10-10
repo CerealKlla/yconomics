@@ -80,7 +80,7 @@ public final class ShopSavedData extends SavedData {
         List<ShopListing> newListings = new java.util.ArrayList<>();
         boolean replaced = false;
         for (ShopListing listing : current.listings()) {
-            if (listing.resource().key().equals(resource.key())) {
+            if (listing.resource().sameVariantAs(resource)) {
                 newListings.add(new ShopListing(resource, pricePerUnit));
                 replaced = true;
             } else {
@@ -103,7 +103,7 @@ public final class ShopSavedData extends SavedData {
             return Optional.empty();
         }
         List<ShopListing> newListings = current.listings().stream()
-                .filter(listing -> !listing.resource().key().equals(resource.key()))
+                .filter(listing -> !listing.resource().sameVariantAs(resource))
                 .toList();
         PlotShop updated = current.withListings(newListings);
         shops.put(shopId, updated);
