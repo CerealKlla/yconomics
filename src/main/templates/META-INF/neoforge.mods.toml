@@ -81,6 +81,17 @@ nugget/ingot conversion recipes, and collects dropped items into a lootable bag.
     ordering="NONE"
     side="BOTH"
 
+# Lyfe is an optional soft dependency -- price.RecipeIndex reads Lyfe's generated tool/weapon/armor
+# recipes (bridge.LyfeRecipeCostBridge) so the price-derivation engine can still price those items
+# even though Lyfe strips their vanilla recipes outright. See build.gradle's own matching compileOnly
+# dependency above.
+[[dependencies.${mod_id}]]
+    modId="lyfe"
+    type="optional"
+    reason="Lets the price-derivation engine read Lyfe's generated tool/weapon/armor recipes."
+    ordering="NONE"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

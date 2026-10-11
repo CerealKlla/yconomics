@@ -140,6 +140,14 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
+    // Lyfe is an optional soft dependency (see neoforge.mods.toml) -- price.RecipeIndex reads Lyfe's
+    // generated tool/weapon/armor recipes (see bridge.LyfeRecipeCostBridge) so the price-derivation
+    // engine can still price those items even though Lyfe strips their vanilla recipes outright.
+    // Gated behind ModList.get().isLoaded("lyfe") at runtime, same isolation pattern every other
+    // optional bridge in this suite uses (e.g. Settlemynts' bridge.LyfeCraftingBridge). compileOnly
+    // only, same reasoning as every other cross-mod optional dependency in this suite.
+    compileOnly files("../Lyfe/build/libs/lyfe-${lyfe_version}.jar")
+
     // Plain JUnit 5 for pure Codec round-trip tests (no live server/registry needed, so
     // ModDevGradle's neoForge { unitTest {} } FML-bootstrap machinery isn't required here).
     testImplementation 'org.junit.jupiter:junit-jupiter:5.7.1'

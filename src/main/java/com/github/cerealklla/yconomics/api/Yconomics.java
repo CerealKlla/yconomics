@@ -10,6 +10,7 @@ import com.github.cerealklla.yconomics.bills.BillTransferEngine;
 import com.github.cerealklla.yconomics.bills.RecurringBill;
 import com.github.cerealklla.yconomics.bills.RecurringBill.BoxRef;
 import com.github.cerealklla.yconomics.currency.CoinPurseContents;
+import com.github.cerealklla.yconomics.price.DerivedPriceTable;
 import com.github.cerealklla.yconomics.registration.ModAttachments;
 import com.github.cerealklla.yconomics.registration.ModItems;
 import com.github.cerealklla.yconomics.shop.PlotShop;
@@ -293,6 +294,25 @@ public final class Yconomics {
         BillTransferEngine.drain(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed));
         BillTransferEngine.deposit(stockBoxes, Map.of(itemId, quantity));
         return new SellResult(quantity, nuggetsOwed, sellPricePerUnit);
+    }
+
+    // Recipe-derived base pricing (design doc, added 2026-10-11, explicit user request: "work
+    // backwards and derive it from actual usage potential") -- see price.PriceDerivation's own doc
+    // for the algorithm. Computed once via /yconomics recalculateprices, read-only here.
+
+    /**
+     * The recipe-derived minimum price for {@code itemId}, if {@code /yconomics recalculateprices}
+     * has ever been run on this server -- empty if it hasn't (never a synthetic default; a caller
+     * that wants a guaranteed fallback should combine this with its own hand-authored price, per the
+     * "new NPC shops default to this going forward" integration pattern in Settlemynts'
+     * {@code zone.ShopSeeding}).
+     */
+    public static Optional<Integer> getDerivedPrice(MinecraftServer server, Identifier itemId) {
+        return server.getDataStorage().computeIfAbsent(DerivedPriceTable.TYPE).get(itemId);
+    }
+
+    public static Optional<Integer> getDerivedPrice(ServerLevel level, Identifier itemId) {
+        return getDerivedPrice(level.getServer(), itemId);
     }
 
     // Generic currency debit (added 2026-10-05 for the Shop purchase flow above) -- the facade's

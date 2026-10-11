@@ -9,6 +9,7 @@ import com.github.cerealklla.yconomics.bills.BillProcessingTicker;
 import com.github.cerealklla.yconomics.currency.CoinPurseListener;
 import com.github.cerealklla.yconomics.debug.DebugCommands;
 import com.github.cerealklla.yconomics.mob.HostileMobDrops;
+import com.github.cerealklla.yconomics.price.PriceCommands;
 import com.github.cerealklla.yconomics.registration.ModAttachments;
 import com.github.cerealklla.yconomics.registration.ModEntities;
 import com.github.cerealklla.yconomics.registration.ModItems;
@@ -41,6 +42,7 @@ public class YconomicsMod {
         NeoForge.EVENT_BUS.register(new LootBagListener());
         NeoForge.EVENT_BUS.register(new BillProcessingTicker());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> PriceCommands.register(event.getDispatcher()));
 
         modEventBus.addListener(this::commonSetup);
     }
