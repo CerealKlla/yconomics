@@ -61,5 +61,6 @@ public final class BillProcessor {
         if (outcome != BillOutcome.PAID) {
             YconomicsMod.LOGGER.info("Recurring bill {} did not pay (outcome: {})", bill.billId(), outcome);
         }
+        BillEvents.fire(server, bill, outcome);
     }
 }

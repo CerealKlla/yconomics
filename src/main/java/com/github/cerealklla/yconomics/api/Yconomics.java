@@ -105,6 +105,11 @@ public final class Yconomics {
         return getRecurringBill(level.getServer(), billId);
     }
 
+    /** See {@code bills.BillEvents}' own doc -- lets a bill-registering mod react to a real payment (e.g. Settlemynts writing plot rent to a Construction Box ledger) with no new dependency on this mod's internals. */
+    public static void registerBillProcessedListener(com.github.cerealklla.yconomics.bills.BillEvents.BillProcessedListener listener) {
+        com.github.cerealklla.yconomics.bills.BillEvents.register(listener);
+    }
+
     /** Every bill registered against {@code ownerContext} (e.g. a Settlemynts plot id) -- for a future plot-bills UI. */
     public static Set<RecurringBill> getRecurringBillsFor(MinecraftServer server, UUID ownerContext) {
         return billData(server).getBillsFor(ownerContext);
