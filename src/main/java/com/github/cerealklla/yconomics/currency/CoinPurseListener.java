@@ -11,6 +11,7 @@ import com.github.cerealklla.yconomics.registration.ModItems;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MerchantMenu;
@@ -140,6 +141,14 @@ public final class CoinPurseListener {
      * removed from the inventory (only from entering the world), so simply cancelling would just
      * destroy it along with whatever it held. Instead: let the toss happen, immediately discard the
      * world entity it created, and hand the player back a fresh purse carrying the same balance.
+     *
+     * <p><b>Real production crash, 2026-10-16</b>: the full-inventory fallback used to call {@link
+     * Player#drop}, which re-fires this very event for the exact same Coin Purse item -- a
+     * recursive re-entry into this handler that tries {@code inventory.add} again, fails again
+     * (the inventory is still full), and calls {@code player.drop} again, forever, until a real
+     * {@code StackOverflowError} crashed the server with a player online. Fixed by spawning the
+     * replacement's {@link ItemEntity} directly (same technique as {@code bag.LootBagListener}'s own
+     * drops) instead of going through the event-firing {@code Player.drop} a second time.
      */
     @SubscribeEvent
     public void onItemToss(ItemTossEvent event) {
@@ -152,7 +161,7 @@ public final class CoinPurseListener {
         ItemStack replacement = new ItemStack(ModItems.COIN_PURSE.get());
         replacement.set(ModItems.COIN_PURSE_CONTENTS, contents);
         if (!player.getInventory().add(replacement)) {
-            player.drop(replacement, false);
+            player.level().addFreshEntity(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), replacement));
         }
     }
 
