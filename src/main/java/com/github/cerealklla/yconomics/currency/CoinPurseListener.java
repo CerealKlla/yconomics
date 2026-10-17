@@ -136,19 +136,29 @@ public final class CoinPurseListener {
     }
 
     /**
-     * The purse can't actually be given away/lost by tossing it (Q or drag-out-of-inventory) --
-     * {@link ItemTossEvent}'s own doc warns that cancelling it does NOT stop the item from being
-     * removed from the inventory (only from entering the world), so simply cancelling would just
-     * destroy it along with whatever it held. Instead: let the toss happen, immediately discard the
-     * world entity it created, and hand the player back a fresh purse carrying the same balance.
+     * The purse can NEVER actually hit the ground (Q or drag-out-of-inventory) -- {@link
+     * ItemTossEvent}'s own doc warns that cancelling it does NOT stop the item from being removed
+     * from the inventory (only from entering the world), so simply cancelling would just destroy it
+     * along with whatever it held. Instead: let the toss happen, immediately discard the world
+     * entity it created, and force a fresh purse carrying the same balance directly into {@link
+     * #PURSE_HOME_SLOT} -- unconditionally, via {@code Inventory#setItem}, never through {@code
+     * Inventory#add}/{@code Player#drop} (which can fail/recurse respectively, see below). Whatever
+     * was occupying that slot (almost always nothing -- the purse itself was just removed from
+     * there by the toss that triggered this event, since {@link #enforcePurseHomeSlot} keeps it
+     * there otherwise) is bumped out: back into the inventory if there's room, dropped on the
+     * ground only as the very last resort -- safe to actually drop, since it is, by construction,
+     * never the purse itself.
      *
-     * <p><b>Real production crash, 2026-10-16</b>: the full-inventory fallback used to call {@link
-     * Player#drop}, which re-fires this very event for the exact same Coin Purse item -- a
-     * recursive re-entry into this handler that tries {@code inventory.add} again, fails again
-     * (the inventory is still full), and calls {@code player.drop} again, forever, until a real
-     * {@code StackOverflowError} crashed the server with a player online. Fixed by spawning the
-     * replacement's {@link ItemEntity} directly (same technique as {@code bag.LootBagListener}'s own
-     * drops) instead of going through the event-firing {@code Player.drop} a second time.
+     * <p><b>Real production crash, 2026-10-16, root-caused and partially fixed, then corrected to
+     * this shape same day</b>: the original full-inventory fallback called {@link Player#drop} to
+     * place the replacement purse in the world, which re-fires this very event for the exact same
+     * Coin Purse item -- a recursive re-entry into this handler that tried {@code inventory.add}
+     * again, failed again, and called {@code player.drop} again, forever, until a real {@code
+     * StackOverflowError} crashed the server with a player online. A first fix swapped that
+     * fallback to spawn the dropped {@link ItemEntity} directly instead of recursing -- which fixed
+     * the crash, but still let the purse itself land on the ground in that one edge case. Explicit
+     * correction: the purse must NEVER touch the ground, period -- it always goes back into its
+     * home slot, full stop; only the item it displaces (never the purse) may end up dropped.
      */
     @SubscribeEvent
     public void onItemToss(ItemTossEvent event) {
@@ -160,8 +170,14 @@ public final class CoinPurseListener {
 
         ItemStack replacement = new ItemStack(ModItems.COIN_PURSE.get());
         replacement.set(ModItems.COIN_PURSE_CONTENTS, contents);
-        if (!player.getInventory().add(replacement)) {
-            player.level().addFreshEntity(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), replacement));
+
+        Inventory inventory = player.getInventory();
+        ItemStack displaced = inventory.getItem(PURSE_HOME_SLOT);
+        inventory.setItem(PURSE_HOME_SLOT, replacement);
+        if (!displaced.isEmpty() && !inventory.add(displaced)) {
+            // Never the purse -- `displaced` was whatever sat in PURSE_HOME_SLOT, which the purse
+            // itself was just removed from by this very toss. Safe to actually drop.
+            player.level().addFreshEntity(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), displaced));
         }
     }
 
