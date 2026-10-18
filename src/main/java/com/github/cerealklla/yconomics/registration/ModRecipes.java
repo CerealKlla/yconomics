@@ -4,6 +4,7 @@ import java.util.function.Supplier;
 
 import com.github.cerealklla.yconomics.YconomicsMod;
 import com.github.cerealklla.yconomics.recipe.GamblingRecipe;
+import com.github.cerealklla.yconomics.recipe.LeafLitterToCharcoalRecipe;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -23,5 +24,10 @@ public final class ModRecipes {
     public static final Supplier<RecipeSerializer<GamblingRecipe>> GAMBLING_SERIALIZER = RECIPE_SERIALIZERS.register(
             "gambling",
             () -> new RecipeSerializer<>(GamblingRecipe.MAP_CODEC, GamblingRecipe.STREAM_CODEC)
+    );
+
+    public static final Supplier<RecipeSerializer<LeafLitterToCharcoalRecipe>> LEAF_LITTER_TO_CHARCOAL_SERIALIZER = RECIPE_SERIALIZERS.register(
+            "leaf_litter_to_charcoal",
+            () -> new RecipeSerializer<>(LeafLitterToCharcoalRecipe.MAP_CODEC, LeafLitterToCharcoalRecipe.STREAM_CODEC)
     );
 }
