@@ -269,25 +269,30 @@ public final class Yconomics {
      * Sells up to {@code quantity} units of {@code itemId} to {@code shopId} -- the reverse of
      * {@link #purchaseFromShop}, reusing the exact same listing lookup. {@code resource} identifies
      * which existing listing this item falls under (a shop only ever buys back something it already
-     * sells, per the user's own spec -- this is not an open "sell anything" mechanic); {@code itemId}
-     * is the concrete item actually being deposited (a tag-based listing like "any log" can cover
-     * several different real items, so the caller -- which has the player's actual held stack --
-     * resolves this, same division of responsibility as {@code purchaseFromShop}'s {@code
-     * itemsReceived}). Price per unit is {@link ShopPricing#deriveBuyPrice} of the listing's own sell
+     * sells, per the user's own spec -- this is not an open "sell anything" mechanic); {@code
+     * soldStacks} are the real, exact stacks being deposited (a tag-based listing like "any log" can
+     * cover several different real items/variants at once, so the caller -- which has the player's
+     * actual held stacks -- resolves exactly what's being sold, same division of responsibility as
+     * {@code purchaseFromShop}'s {@code itemsReceived}). Deposited via {@link
+     * BillTransferEngine#depositStacks} (added 2026-10-17, real report: the old plain id+quantity
+     * deposit reconstructs a brand-new, blank-default stack -- silently destroying the real identity
+     * of any item whose identity lives in a component rather than its base item type, e.g. Lyfe's
+     * Research Notes). Price per unit is {@link ShopPricing#deriveBuyPrice} of the listing's own sell
      * price -- never separately configurable, so it can never drift out of the required 60%
      * relationship. All-or-nothing: {@code 0} if the shop's {@code paymentBoxes} can't cover the full
-     * {@code quantity} at once (no partial-fill support, unlike the buy direction -- a shop simply
+     * quantity at once (no partial-fill support, unlike the buy direction -- a shop simply
      * isn't open for business on an item it can't currently afford).
      */
-    public static SellResult sellToShop(ServerLevel level, UUID shopId, ShopResource resource, Identifier itemId, int quantity,
+    public static SellResult sellToShop(ServerLevel level, UUID shopId, ShopResource resource, List<ItemStack> soldStacks,
                                          List<Container> stockBoxes, List<Container> paymentBoxes) {
         Optional<PlotShop> shop = getPlotShop(level, shopId);
-        if (shop.isEmpty()) {
+        if (shop.isEmpty() || soldStacks.isEmpty()) {
             return new SellResult(0, 0, 0);
         }
         Optional<ShopListing> listing = shop.get().listings().stream()
                 .filter(l -> l.resource().coversSameListingAs(resource))
                 .findFirst();
+        int quantity = soldStacks.stream().mapToInt(ItemStack::getCount).sum();
         if (listing.isEmpty() || quantity <= 0) {
             return new SellResult(0, 0, 0);
         }
@@ -297,7 +302,7 @@ public final class Yconomics {
             return new SellResult(0, 0, 0);
         }
         BillTransferEngine.drain(paymentBoxes, Map.of(GOLD_NUGGET_ID, nuggetsOwed));
-        BillTransferEngine.deposit(stockBoxes, Map.of(itemId, quantity));
+        BillTransferEngine.depositStacks(stockBoxes, soldStacks);
         return new SellResult(quantity, nuggetsOwed, sellPricePerUnit);
     }
 

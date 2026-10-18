@@ -143,6 +143,34 @@ public final class BillTransferEngine {
         return remainder;
     }
 
+    /**
+     * Same fill-overflow-to-next-box behavior as {@link #deposit}, but for real {@link ItemStack}s --
+     * preserves every component, not just the bare item id+count. Added 2026-10-17, real report: a
+     * Settlemynts Shop "sell" transaction used to deposit via {@link #deposit}'s plain id+quantity
+     * form, which reconstructs a brand-new, blank-default stack from just the registered item type --
+     * silently discarding the real identity of whatever was actually sold for any item whose identity
+     * lives in a component, not the base item type (e.g. Lyfe's Research Notes, which store WHICH
+     * recipe target they teach as a component -- a sold note would land in the shop's box as an inert
+     * default-target note, unrecognizable as what the seller actually held). Returns whatever didn't
+     * fit anywhere, as real stacks (not a bare id+count remainder) so a caller can hand them back.
+     */
+    public static List<ItemStack> depositStacks(List<Container> destinations, List<ItemStack> toDeposit) {
+        List<ItemStack> remainder = new ArrayList<>();
+        for (ItemStack stack : toDeposit) {
+            ItemStack toPlace = stack.copy();
+            for (Container container : destinations) {
+                if (toPlace.isEmpty()) {
+                    break;
+                }
+                toPlace = depositIntoOne(container, toPlace);
+            }
+            if (!toPlace.isEmpty()) {
+                remainder.add(toPlace);
+            }
+        }
+        return remainder;
+    }
+
     private static ItemStack depositIntoOne(Container container, ItemStack incoming) {
         ItemStack remainder = incoming;
         for (int slot = 0; slot < container.getContainerSize() && !remainder.isEmpty(); slot++) {
