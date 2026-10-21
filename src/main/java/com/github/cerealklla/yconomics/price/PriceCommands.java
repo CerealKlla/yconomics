@@ -92,8 +92,31 @@ public final class PriceCommands {
         return price.get();
     }
 
+    /** What one recalculation run produced -- shared between the manual command and the automatic boot-time run below. */
+    public record Result(String summary, int itemCount, int depthGuardHits) {
+    }
+
     private static int recalculate(CommandSourceStack source) {
-        MinecraftServer server = source.getServer();
+        Result result = runRecalculation(source.getServer());
+        source.sendSuccess(() -> Component.literal(result.summary()), true);
+        if (result.depthGuardHits() > 0) {
+            String guardNote = "(Cycle/depth guard fired " + result.depthGuardHits() + " time(s) -- normal for real refinement chains, informational only.)";
+            source.sendSuccess(() -> Component.literal(guardNote), false);
+        }
+        return result.itemCount();
+    }
+
+    /**
+     * The actual recalculation pass, extracted 2026-10-20 so it can run automatically at server boot
+     * (see {@code YconomicsMod}'s own {@code ServerStartedEvent} listener) as well as from the manual
+     * `/yconomics recalculateprices` command -- explicit user spec: "I don't want to ever have to run
+     * commands... something is wired up to re-calculate the recipes, just add that on at the end of
+     * that method running." The real gap this closes: a fresh world's derived-price table started out
+     * completely empty (confirmed live, 2026-10-20 -- every item, including Wheat, returned "no
+     * derived price" from `/yconomics derivedprice`), silently leaving every Shop in the suite pricing
+     * off raw catalog fallback values until someone remembered to run the command by hand.
+     */
+    public static Result runRecalculation(MinecraftServer server) {
         long start = System.nanoTime();
 
         RecipeIndex index = RecipeIndex.buildFor(server);
@@ -131,12 +154,7 @@ public final class PriceCommands {
                 "Recalculated derived prices for %d item(s) from %d recipe(s) in %.1fms (%s, %d item(s) raised by the breaks-down-into enforcement pass).%s",
                 itemCount, edgeCount, ms, deterministic ? "deterministic" : "NOT deterministic -- check logs", enforcedUpward.size(),
                 ceilingHit.isEmpty() ? "" : " WARNING: " + ceilingHit.size() + " item(s) hit the sanity ceiling -- check logs.");
-        source.sendSuccess(() -> Component.literal(summary), true);
-        if (depthGuardHits > 0) {
-            String guardNote = "(Cycle/depth guard fired " + depthGuardHits + " time(s) -- normal for real refinement chains, informational only.)";
-            source.sendSuccess(() -> Component.literal(guardNote), false);
-        }
-        return itemCount;
+        return new Result(summary, itemCount, depthGuardHits);
     }
 
     private static Map<Identifier, Integer> deriveAll(PriceDerivation derivation) {
