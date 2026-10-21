@@ -111,7 +111,40 @@ public final class CoinPurseListener {
     @SubscribeEvent
     public void onContainerClose(PlayerContainerEvent.Close event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            recoverPurseFromForeignContainer(player, event.getContainer());
             sweepNuggetsIntoPurse(player);
+        }
+    }
+
+    /**
+     * The purse must never come to rest in any container besides the player's own inventory -- real
+     * report, 2026-10-20 (screenshot showing a Coin Purse sitting in a Large Chest): a player could
+     * shift-click/drag it directly into an open chest, where none of this class's other protections
+     * (toss, death, home-slot enforcement) ever look, since they all only ever scan the player's own
+     * {@link Inventory}. Same "no generic item-entered-a-container event exists, so correct on close
+     * instead" shape Blueprynts' own {@code construction.FootprintSlabGuard} already uses for the
+     * identical class of problem (see that class's own doc) -- the item may sit in a chest slot while
+     * the screen is open, but the moment it closes, anything still there gets pulled back out. Unlike
+     * a plain stack, the recovered purse must preserve its real balance and land specifically in
+     * {@link #PURSE_HOME_SLOT} (never just "anywhere there's room"), matching {@link #onItemToss}'s
+     * own recovery shape exactly rather than a generic {@code Inventory#add}.
+     */
+    private static void recoverPurseFromForeignContainer(ServerPlayer player, net.minecraft.world.inventory.AbstractContainerMenu menu) {
+        Inventory inventory = player.getInventory();
+        for (net.minecraft.world.inventory.Slot slot : menu.slots) {
+            if (slot.container == inventory || !slot.getItem().is(ModItems.COIN_PURSE.get())) {
+                continue;
+            }
+            CoinPurseContents contents = slot.getItem().getOrDefault(ModItems.COIN_PURSE_CONTENTS, CoinPurseContents.EMPTY);
+            slot.set(ItemStack.EMPTY);
+
+            ItemStack replacement = new ItemStack(ModItems.COIN_PURSE.get());
+            replacement.set(ModItems.COIN_PURSE_CONTENTS, contents);
+            ItemStack displaced = inventory.getItem(PURSE_HOME_SLOT);
+            inventory.setItem(PURSE_HOME_SLOT, replacement);
+            if (!displaced.isEmpty() && !inventory.add(displaced)) {
+                player.level().addFreshEntity(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), displaced));
+            }
         }
     }
 
