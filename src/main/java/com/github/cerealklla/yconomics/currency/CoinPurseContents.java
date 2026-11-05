@@ -32,7 +32,15 @@ public record CoinPurseContents(List<ItemStack> stacks) {
             .map(CoinPurseContents::new, CoinPurseContents::stacks);
 
     public CoinPurseContents {
-        stacks = List.copyOf(stacks);
+        // Defensively strips any already-empty entry (2026-11-04 -- a real live bug: removeLast()
+        // used to shallow-copy its list, sharing live ItemStack instances with whatever the caller
+        // did with the popped stack; a since-shrunk-to-0 stack sharing a reference with one still
+        // sitting in this list could end up persisted here, and the network layer's strict item-list
+        // codec refuses to encode a zero-count entry at all, disconnecting the player outright on the
+        // next inventory sync). Filtering here means any already-corrupted purse self-heals the next
+        // time it round-trips through this constructor (every codec decode included), no migration
+        // needed.
+        stacks = stacks.stream().filter(stack -> !stack.isEmpty()).toList();
     }
 
     /** Builds fresh 64-nugget-or-fewer stacks totaling exactly {@code count} -- used to restore a death-retained balance on respawn. */
@@ -113,8 +121,15 @@ public record CoinPurseContents(List<ItemStack> stacks) {
         if (stacks.isEmpty()) {
             return new RemoveResult(this, ItemStack.EMPTY);
         }
-        List<ItemStack> next = new ArrayList<>(stacks);
-        ItemStack removed = next.remove(next.size() - 1);
+        // Deep-copy each stack (matching insert()/withdraw()'s own convention) -- the remaining
+        // stacks must never share live ItemStack instances with the ones handed back out via
+        // `removed`, or a later mutation of one reference (e.g. the caller's stack getting merged/
+        // shrunk into an existing inventory slot) could silently corrupt what's still stored here.
+        List<ItemStack> next = new ArrayList<>(stacks.size() - 1);
+        for (int i = 0; i < stacks.size() - 1; i++) {
+            next.add(stacks.get(i).copy());
+        }
+        ItemStack removed = stacks.get(stacks.size() - 1).copy();
         return new RemoveResult(new CoinPurseContents(next), removed);
     }
 
