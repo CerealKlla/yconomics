@@ -122,7 +122,13 @@ public final class RecipeIndex {
         }
     }
 
-    private void addEdge(RecipeEdge edge) {
+    // Package-private (not private), 2026-11-05 -- lets PriceDerivationTest hand-build a real
+    // RecipeEdge graph (known vanilla recipe shapes) without needing a live MinecraftServer/
+    // RecipeManager, which this project's test harness genuinely can't bootstrap (see
+    // GamblingRecipeTest's own sibling tests for why ItemStack/registry construction is avoided in
+    // plain JUnit here). RecipeEdge/RecipeIndex/PriceDerivation only ever operate on Identifier, so
+    // this is a real, non-approximated test of the actual solver logic.
+    void addEdge(RecipeEdge edge) {
         edges.add(edge);
         if (!edge.isSingleIngredientType()) {
             return; // Assembly (multiple distinct ingredient types) only ever prices its output -- see RecipeEdge's own doc.

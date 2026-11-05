@@ -19,10 +19,11 @@ import net.minecraft.resources.Identifier;
  * directions and takes whichever is higher:
  *
  * <ul>
- *   <li><b>Crafted from</b> ({@link RecipeIndex#producing}) -- for every recipe that produces this
- *   item (any shape, including assembly), {@code 1.1 * sum(cost of each input slot's cheapest
- *   option) / outputCount}. A Stone Pickaxe's floor comes from its own ingredient sum this way (2
- *   Sticks + 3 Cobblestone).</li>
+ *   <li><b>Crafted from</b> ({@link RecipeIndex#producing}) -- {@code 1.1 * sum(cost of each input
+ *   slot's cheapest option) / outputCount} for the *cheapest* of every recipe that produces this
+ *   item (any shape, including assembly) -- see {@link #cheapestProducingCost}'s own doc for why
+ *   this takes the cheapest recipe across multiple producers, not the most expensive one. A Stone
+ *   Pickaxe's floor comes from its own ingredient sum this way (2 Sticks + 3 Cobblestone).</li>
  *   <li><b>Breaks down into</b> ({@link RecipeIndex#refiningInto}) -- for every *single-ingredient-
  *   type* recipe that consumes this item (Log -> Planks, Gold Ingot -> Gold Nuggets -- a genuine
  *   refinement, not assembly), {@code 1.1 * cost(output) * outputCount / qty needed}. A Wood Log's
@@ -82,6 +83,35 @@ import net.minecraft.resources.Identifier;
  * {@code /yconomics recalculateprices} (see that class's own doc for how the command reports and
  * logs this), so a future regression is loud and visible instead of a silently-wrong shop price
  * nobody notices until a player does.
+ *
+ * <p><b>Real bug found and fixed, 2026-11-05: "How on earth do you figure oak wood stairs are worth
+ * 108g?"</b> (screenshot also showed Oak Door/Trapdoor-shaped goods at 144g/86g buy/sell). Root cause
+ * confirmed by direct live instrumentation of the real recipe graph on a real suite server with Lyfe
+ * loaded (several rounds of hand-tracing were tried first and each one turned out subtly wrong --
+ * this recursive solver is genuinely too easy to mis-simulate by hand, confirmed the hard way):
+ * {@link #cheapestProducingCost}'s forward ("crafted from") loop used to take {@code Math.max} across
+ * every real recipe that produces the same item, reasoning the item's value should reflect whichever
+ * recipe looks worst. Charcoal has two real producing recipes -- a cheap 1:1 smelting recipe from any
+ * of 9 log species, and a Lyfe-added 64-Leaf-Litter-for-1-Charcoal disposal/recycling recipe for
+ * excess leaf litter -- and taking the max meant Charcoal's own price was dominated by the
+ * deliberately wasteful 64:1 recipe nobody would ever actually use to obtain it (Charcoal computed to
+ * 141 gold), not the cheap smelting path everyone actually would. That inflated Charcoal price then
+ * fed directly into Oak Log's own "breaks down into" direction (Log -> Charcoal is a real single-
+ * ingredient refinement), pushing Oak Log to 234, which cascaded forward through Oak Planks (80) into
+ * every plank-built good shown in the report -- Oak Stairs 108, Oak Door 144, Oak Trapdoor 215, Oak
+ * Boat 358 -- explaining why several unrelated plank goods were all inflated together in the same
+ * shop. A rational crafter always takes whichever real recipe is cheapest, so the cheapest one is the
+ * item's genuine cost floor -- the same "always take the cheapest path" rule this solver already
+ * applies *within* one recipe's own ingredient slots ({@link #cheapestOf}/{@link
+ * #cheapestBackwardOnly}), now also applied *across* multiple recipes for the same output via the new
+ * {@link #cheapestProducingCost} (shared by both {@link #derive} and {@link #backwardOnly}'s own
+ * forward loops, replacing their separate near-identical {@code Math.max} loops). Confirmed live
+ * after the fix: Oak Stairs 108 -> 9, Oak Planks 80 -> 5, Oak Log 234 -> 9 (matching this very class
+ * doc's own long-standing "Log priced around 9" example exactly), Charcoal 141 -> 10, with every
+ * legitimate late-game item (Netherite tools, Lyfe's own high-tier gear) still priced far higher, as
+ * expected -- this narrows absurd/wrong prices without flattening genuine tiered pricing. A second,
+ * independent, minor bug found and fixed the same investigation is documented in {@code
+ * PriceCommands#enforceBreaksDownIntoFloor}'s own doc.
  */
 public final class PriceDerivation {
 
@@ -125,6 +155,21 @@ public final class PriceDerivation {
         return derive(itemId, Set.of(), 0);
     }
 
+    /**
+     * Public entry point for {@link #backwardOnly} -- added 2026-11-05 for {@code
+     * PriceCommands#enforceBreaksDownIntoFloor}'s own real bug fix (see that method's doc): it used
+     * to read an output's full {@link #derive} price to raise a raw material's floor, which reopens
+     * the exact same-relationship-markups-itself-twice instability {@link #backwardOnly} exists to
+     * avoid in the first place -- just one level later, and silently bounded instead of diverging, so
+     * it was never caught by the determinism/ceiling checks. Shares this instance's own {@link
+     * #backwardMemo}, so calling this after a full {@link #derive} pass over the same items is cheap
+     * (almost every lookup is already memoized from {@code derive}'s own internal {@link
+     * #backwardOnly} calls).
+     */
+    public int deriveBackwardOnly(Identifier itemId) {
+        return backwardOnly(itemId, Set.of(), 0);
+    }
+
     private int derive(Identifier itemId, Set<Identifier> visiting, int depth) {
         Integer cached = memo.get(itemId);
         if (cached != null) {
@@ -140,13 +185,9 @@ public final class PriceDerivation {
         int nextDepth = depth + 1;
 
         int best = -1;
-        for (RecipeEdge edge : index.producing(itemId)) {
-            long inputCost = 0;
-            for (List<Identifier> slot : edge.inputs()) {
-                inputCost += cheapestOf(slot, nextVisiting, nextDepth);
-            }
-            int candidate = (int) Math.ceil(MARKUP * inputCost / edge.outputCount());
-            best = Math.max(best, candidate);
+        int cheapestProducing = cheapestProducingCost(index.producing(itemId), nextVisiting, nextDepth, false);
+        if (cheapestProducing >= 0) {
+            best = cheapestProducing;
         }
         for (RecipeEdge edge : index.refiningInto(itemId)) {
             long qtyNeeded = edge.inputs().stream().filter(slot -> slot.contains(itemId)).count();
@@ -159,7 +200,8 @@ public final class PriceDerivation {
             // "what this item breaks down into."
             int outputCost = backwardOnly(edge.output(), nextVisiting, nextDepth);
             double perUnit = (double) outputCost * edge.outputCount() / qtyNeeded;
-            best = Math.max(best, (int) Math.ceil(MARKUP * perUnit));
+            int candidate = (int) Math.ceil(MARKUP * perUnit);
+            best = Math.max(best, candidate);
         }
 
         int result = Math.max(best > 0 ? best : ShopPricing.MIN_SELL_PRICE, ShopPricing.MIN_SELL_PRICE);
@@ -212,15 +254,7 @@ public final class PriceDerivation {
         Set<Identifier> nextVisiting = withAdded(visiting, itemId);
         int nextDepth = depth + 1;
 
-        int best = -1;
-        for (RecipeEdge edge : index.producing(itemId)) {
-            long inputCost = 0;
-            for (List<Identifier> slot : edge.inputs()) {
-                inputCost += cheapestBackwardOnly(slot, nextVisiting, nextDepth);
-            }
-            int candidate = (int) Math.ceil(MARKUP * inputCost / edge.outputCount());
-            best = Math.max(best, candidate);
-        }
+        int best = cheapestProducingCost(index.producing(itemId), nextVisiting, nextDepth, true);
 
         int result = Math.max(best > 0 ? best : ShopPricing.MIN_SELL_PRICE, ShopPricing.MIN_SELL_PRICE);
         result = Math.min(result, MAX_REASONABLE_PRICE); // Silent clamp -- the public derive() path already logs/tracks ceiling hits once per item.
@@ -236,6 +270,36 @@ public final class PriceDerivation {
     /** How many times the cycle/depth guard fired this pass -- informational, not itself alarming (real refinement pairs legitimately trigger it), but a sharp jump between passes is worth a second look. */
     public int depthGuardHitCount() {
         return depthGuardHits;
+    }
+
+    /**
+     * The real cost of the *cheapest* way to craft {@code itemId}, across every recipe that produces
+     * it -- {@code -1} if there's no real recipe at all. Added 2026-11-05, real bug fix: this used to
+     * take the <i>highest</i>-costing recipe across every producer ({@code Math.max}), on the
+     * reasoning that the item's value should reflect whichever recipe happens to look worst -- but
+     * real report "How on earth do you figure oak wood stairs are worth 108g?" traced to exactly
+     * this: Charcoal has two real producing recipes (a 1:1 smelting recipe from any of 9 log species,
+     * and a Lyfe-added 64-Leaf-Litter-for-1-Charcoal disposal/recycling recipe for excess leaf
+     * litter) -- taking the max meant Charcoal's own computed price was dominated by the deliberately
+     * wasteful 64:1 disposal recipe nobody would actually use to obtain it, not the cheap smelting
+     * recipe everyone actually would, and that one inflated price then cascaded through Oak Log (one
+     * of Charcoal's own "breaks down into" sources) into Oak Planks and every plank-based good built
+     * from it. A rational crafter always takes the cheapest available recipe, so the cheapest one is
+     * the item's real cost floor -- matching every other "always take the cheapest path" precedent
+     * already used *within* a single recipe's own ingredient slots ({@link #cheapestOf}/{@link
+     * #cheapestBackwardOnly}), just now also applied *across* multiple recipes for the same output.
+     */
+    private int cheapestProducingCost(List<RecipeEdge> edges, Set<Identifier> visiting, int depth, boolean backward) {
+        int best = -1;
+        for (RecipeEdge edge : edges) {
+            long inputCost = 0;
+            for (List<Identifier> slot : edge.inputs()) {
+                inputCost += backward ? cheapestBackwardOnly(slot, visiting, depth) : cheapestOf(slot, visiting, depth);
+            }
+            int candidate = (int) Math.ceil(MARKUP * inputCost / edge.outputCount());
+            best = best < 0 ? candidate : Math.min(best, candidate);
+        }
+        return best;
     }
 
     private int cheapestOf(List<Identifier> slot, Set<Identifier> visiting, int depth) {

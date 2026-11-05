@@ -47,8 +47,21 @@ import net.minecraft.server.MinecraftServer;
  * the determinism fix just closed -- so Log never inherited Planks' *own* independent forward value
  * (Planks -> Crafting Table is a separate real refinement). {@link #enforceBreaksDownIntoFloor} is
  * the real fix for the user's literal requirement ("a log must never be priced below what it
- * produces") -- raises an input's price to {@code MARKUP * the output's real final price * ratio}
- * if it's currently lower, using every item's already-settled {@link PriceDerivation} result.
+ * produces") -- raises an input's price to {@code MARKUP * the output's backward-only cost * ratio}
+ * if it's currently lower.
+ *
+ * <p><b>Secondary real bug found and fixed, 2026-11-05, as part of the "Oak Stairs 108g" investigation
+ * below</b> -- this pass originally used each output's full {@link PriceDerivation#derive} price
+ * here, not its {@link PriceDerivation#deriveBackwardOnly} cost, which is exactly the "a direct
+ * relationship's two directions each apply their own markup to the other's already-marked-up value"
+ * instability {@link PriceDerivation}'s own class doc explains fixing for {@code derive()} itself --
+ * reopened here one level later, except silently bounded (a single non-iterated pass can't diverge to
+ * infinity the way the original cycle did) rather than caught by the determinism/ceiling checks, so it
+ * shipped unnoticed. Fixed by switching to {@link PriceDerivation#deriveBackwardOnly}, the exact same
+ * cycle-safe value {@link PriceDerivation} itself already uses internally for this identical
+ * relationship. This alone was NOT the dominant cause of the 108g report (see {@link PriceDerivation}'s
+ * own class doc for the real, much larger root cause found the same day) but is a real, independent
+ * correctness fix worth keeping regardless.
  *
  * <p><b>Deliberately exactly one pass, not iterated to convergence</b> -- a first attempt ran this
  * repeatedly (feeding each round's updated prices into the next) and live-testing proved that's the
@@ -120,7 +133,8 @@ public final class PriceCommands {
         long start = System.nanoTime();
 
         RecipeIndex index = RecipeIndex.buildFor(server);
-        Map<Identifier, Integer> prices = deriveAll(new PriceDerivation(index));
+        PriceDerivation derivation = new PriceDerivation(index);
+        Map<Identifier, Integer> prices = deriveAll(derivation);
         PriceDerivation checkRun = new PriceDerivation(index);
         Map<Identifier, Integer> check = deriveAll(checkRun);
         boolean deterministic = prices.equals(check);
@@ -128,7 +142,7 @@ public final class PriceCommands {
         Set<Identifier> ceilingHit = new java.util.HashSet<>(checkRun.itemsAtCeiling());
         int depthGuardHits = checkRun.depthGuardHitCount();
 
-        Set<Identifier> enforcedUpward = enforceBreaksDownIntoFloor(prices, index, ceilingHit);
+        Set<Identifier> enforcedUpward = enforceBreaksDownIntoFloor(prices, index, derivation, ceilingHit);
 
         // Structural safety net, not just this session's own fix -- explicit user request: "bake in
         // a real fix so that future items/recipes don't silently break behind the scenes." Logged
@@ -169,12 +183,32 @@ public final class PriceCommands {
     /**
      * Post-processing fix for a real gap {@link PriceDerivation}'s own recursive computation can't
      * close without reopening the cycle it was built to avoid -- see this class's own doc. Mutates
-     * {@code prices} in place; returns the set of items actually raised. Reads every output price
-     * from a frozen snapshot of the pre-enforcement results (never the map being written to), so this
-     * is a single, non-recursive, non-iterated pass by construction -- see this class's own doc for
-     * why iterating it further reopens the exact divergence it exists to avoid.
+     * {@code prices} in place; returns the set of items actually raised. {@code current}/{@code best}
+     * are read from a frozen snapshot of the pre-enforcement results (never the map being written
+     * to), so this is a single, non-recursive, non-iterated pass by construction -- see this class's
+     * own doc for why iterating it further reopens the exact divergence it exists to avoid.
+     *
+     * <p><b>Real bug fix, 2026-11-05</b> -- {@code outputPrice} used to be read straight off {@code
+     * snapshot} (the output's full, forward-inclusive {@link PriceDerivation#derive} result); now
+     * reads {@code derivation}'s {@link PriceDerivation#deriveBackwardOnly} instead, the same
+     * cycle-safe value {@link PriceDerivation} already uses internally for this identical
+     * relationship -- see this class's own doc, and {@link PriceDerivation}'s own class doc, for the
+     * full real-report writeup ("How on earth do you figure oak wood stairs are worth 108g?"). This
+     * was a real, independent bug, but turned out to be the *minor* contributor to the 108g figure --
+     * {@link PriceDerivation}'s own fix the same day (taking the cheapest of multiple recipes that
+     * produce the same item, not the most expensive) was the dominant one. Confirmed live together
+     * (temporary debug dump against a real suite server with Lyfe loaded): Oak Stairs 108 -> 9, Oak
+     * Planks 80 -> 5, Oak Log 234 -> 9 (matching {@link PriceDerivation}'s own long-documented "Log
+     * priced around 9" example exactly), Oak Door 144 -> 11, Oak Trapdoor 215 -> 17, Oak Boat 358 ->
+     * 28, Chest 97 -> 44, Crafting Table 49 -> 22, Charcoal 141 -> 10, Gold Ingot/Glass Pane unchanged
+     * or equally sane, with legitimate late-game items (Netherite tools, Lyfe's own high-tier gear)
+     * still appropriately far more expensive than any of these -- the fix narrows absurd/wrong
+     * prices, it doesn't flatten real tiered pricing.
      */
-    private static Set<Identifier> enforceBreaksDownIntoFloor(Map<Identifier, Integer> prices, RecipeIndex index, Set<Identifier> ceilingHit) {
+    // Package-private (not private), 2026-11-05 -- lets PriceDerivationTest exercise the real
+    // enforcement pass directly against a hand-built RecipeIndex, same reasoning as RecipeIndex
+    // #addEdge's own doc.
+    static Set<Identifier> enforceBreaksDownIntoFloor(Map<Identifier, Integer> prices, RecipeIndex index, PriceDerivation derivation, Set<Identifier> ceilingHit) {
         Map<Identifier, Integer> snapshot = Map.copyOf(prices);
         Set<Identifier> raised = new java.util.HashSet<>();
         for (Identifier itemId : snapshot.keySet()) {
@@ -185,10 +219,7 @@ public final class PriceCommands {
                 if (qtyNeeded == 0) {
                     continue;
                 }
-                Integer outputPrice = snapshot.get(edge.output());
-                if (outputPrice == null) {
-                    continue;
-                }
+                int outputPrice = derivation.deriveBackwardOnly(edge.output());
                 double perUnit = (double) outputPrice * edge.outputCount() / qtyNeeded;
                 int candidate = (int) Math.ceil(PriceDerivation.MARKUP * perUnit);
                 best = Math.max(best, candidate);
